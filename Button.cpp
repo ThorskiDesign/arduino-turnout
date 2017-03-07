@@ -75,4 +75,4 @@ int Button::NumUpdates() { return numUpdates; }
 bool Button::HasChanged() { return hasChanged; }
 
 // Assign the callback function for the button press event
-void Button::SetButtonPressHandler(void (*Handler)(bool)) {	buttonPressHandler = Handler; }
+void Button::SetButtonPressHandler(void (*Handler)(bool)) { buttonPressHandler = Handler; }
