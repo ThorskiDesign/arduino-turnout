@@ -39,7 +39,7 @@ void TurnoutMgr::Initialize()
 // Run the dcc process update. this needs to be run from loop().
 void TurnoutMgr::UpdateDccProcess()
 { 
-	dcc.process();
+	dcc.loop();
 }
 
 
@@ -71,40 +71,43 @@ void TurnoutMgr::UpdateSensors()
 // Initialize the turnout manager by setting up the dcc config, reading stored values from CVs, and setting up the servo
 void TurnoutMgr::InitMain()
 {
-	// Setup which External Interrupt, the Pin it's associated with that we're using and enable the Pull-Up
-	dcc.pin(0, DCCPin, 0);
+	// TODO: Setup which External Interrupt, the Pin it's associated with that we're using and enable the Pull-Up
 
 	// Call the main DCC Init function to enable the DCC Receiver
-	dcc.init( MAN_ID_DIY, 10, CV29_ACCESSORY_DECODER, 0 );
-	Serial.println("DCC init done.");
+    dcc.SetupDecoder(0, 0, DCCInt);
+    Serial.println("DCC init done.");
 
 	// get variables from cv's
-	dccAddress = dcc.getAddr();
-	servoEndPointSwap = dcc.getCV(CV_servoEndPointSwap);
-	occupancySensorSwap = dcc.getCV(CV_occupancySensorSwap);
-	dccCommandSwap = dcc.getCV(CV_dccCommandSwap);
-	relaySwap = dcc.getCV(CV_relaySwap);
+	dccAddress = dcc.Address();
+	servoEndPointSwap = dcc.GetCV(CV_servoEndPointSwap);
+	occupancySensorSwap = dcc.GetCV(CV_occupancySensorSwap);
+	dccCommandSwap = dcc.GetCV(CV_dccCommandSwap);
+	relaySwap = dcc.GetCV(CV_relaySwap);
 
 	Serial.print("Parameters read from CVs, using dcc address ");
 	Serial.println(dccAddress, DEC);
 
 	// set the current position based on the stored position
-	position = (dcc.getCV(CV_turnoutPosition) == 0) ? STRAIGHT : CURVED;
+	position = (dcc.GetCV(CV_turnoutPosition) == 0) ? STRAIGHT : CURVED;
 
 	// servo setup - get extents, rates, and last position from cv's
 	State servoState = position;
 	if (servoEndPointSwap) servoState = (State) !servoState;  // swap the servo endpoints if needed
 	servo.Initialize(
-		dcc.getCV(CV_servoMinTravel),
-		dcc.getCV(CV_servoMaxTravel),
-		dcc.getCV(CV_servoLowSpeed) * 100,
-		dcc.getCV(CV_servoHighSpeed) * 100,
+		dcc.GetCV(CV_servoMinTravel),
+		dcc.GetCV(CV_servoMaxTravel),
+		dcc.GetCV(CV_servoLowSpeed) * 100,
+		dcc.GetCV(CV_servoHighSpeed) * 100,
 		servoState);
 	Serial.println("Servo init done.");
 	Serial.print("Servo position read from CVs is ");
 	Serial.println(position, DEC);
 
-	// configure the event handlers
+    // configure dcc event handlers
+    dcc.SetBasicAccessoryDecoderPacketHandler(&HandleDCCAccPacket, false);
+    dcc.SetBasicAccessoryPomPacketHandler(&HandleDCCAccPomPacket);
+
+	// configure other event handlers
 	button.SetButtonPressHandler(&HandleButtonPressWrapper);
 	servo.SetServoMoveDoneHandler(&HandleServoMoveDoneWrapper);
 	servo.SetServoPowerOffHandler(&HandleServoPowerOffWrapper);
@@ -120,28 +123,25 @@ void TurnoutMgr::InitMain()
 // perform a reset to factory defaults
 void TurnoutMgr::FactoryReset()
 {
-	Serial.println("Reset to defaults initiated.");
+    Serial.println("Reset to defaults initiated.");
 
-	factoryReset = true;    // set flag indicating we are in reset
-	unsigned long resetDelay = 2500;  // time to flash led so we have indication of reset occuring
-	
-	// normal initilization will resume after this timer expires
-	resetTimer.StartTimer(resetDelay);
-	resetTimer.SetTimerHandler(&HandleResetTimerWrapper);
+    factoryReset = true;    // set flag indicating we are in reset
+    unsigned long resetDelay = 2500;  // time to flash led so we have indication of reset occuring
 
-	led.SetLED(RgbLed::MAGENTA, RgbLed::FLASH);
+    // normal initilization will resume after this timer expires
+    resetTimer.StartTimer(resetDelay);
+    resetTimer.SetTimerHandler(&HandleResetTimerWrapper);
 
-	// do the reset
-	if(dcc.isSetCVReady())
-	{
-		unsigned int numCVs = sizeof(FactoryDefaultCVs)/sizeof(CVPair);
-		for (unsigned int cv = 0; cv < numCVs; cv++)
-		{
-			dcc.setCV( FactoryDefaultCVs[cv].CV, FactoryDefaultCVs[cv].Value);
-		}
-	}
+    led.SetLED(RgbLed::MAGENTA, RgbLed::FLASH);
 
-	Serial.println("Reset to defaults completed.");
+    // do the reset
+    unsigned int numCVs = sizeof(FactoryDefaultCVs)/sizeof(CVPair);
+    for (unsigned int cv = 0; cv < numCVs; cv++)
+    {
+        dcc.SetCV( FactoryDefaultCVs[cv].CV, FactoryDefaultCVs[cv].Value);
+    }
+
+    Serial.println("Reset to defaults completed.");
 }
 
 
@@ -184,7 +184,7 @@ void TurnoutMgr::SetServo(bool ServoRate)
 #endif
 
 	// store new position to cv
-	dcc.setCV(CV_turnoutPosition,position);
+	dcc.SetCV(CV_turnoutPosition,position);
 }
 
 
@@ -311,11 +311,8 @@ void TurnoutMgr::DCCcommandHandler(unsigned int Addr, unsigned int Direction)
 
 
 // handle setting CVs
-void TurnoutMgr::CVchangeHandler(unsigned int CV, unsigned int Value)
+void TurnoutMgr::DCCPomHandler(unsigned int CV, unsigned int Value)
 {
-	// we don't read back the stored position, since this updates every time the switch changes
-	if (factoryReset || CV == CV_turnoutPosition) return;
-
 	// provide feedback that we are programming
 	led.SetLED(RgbLed::YELLOW, RgbLed::ON);
 
@@ -324,18 +321,18 @@ void TurnoutMgr::CVchangeHandler(unsigned int CV, unsigned int Value)
 	errorTimer.SetTimerHandler(&HandleErrorTimerWrapper);
 
 	// set the cv
-	if(dcc.isSetCVReady()) dcc.setCV(CV, Value);
+	dcc.SetCV(CV, Value);
 
 	// read back values from eeprom
-	dccAddress = dcc.getAddr();
-	servoEndPointSwap = dcc.getCV(CV_servoEndPointSwap);
-	occupancySensorSwap = dcc.getCV(CV_occupancySensorSwap);
-	dccCommandSwap = dcc.getCV(CV_dccCommandSwap);
-	relaySwap = dcc.getCV(CV_relaySwap);
+	dccAddress = dcc.Address();
+	servoEndPointSwap = dcc.GetCV(CV_servoEndPointSwap);
+	occupancySensorSwap = dcc.GetCV(CV_occupancySensorSwap);
+	dccCommandSwap = dcc.GetCV(CV_dccCommandSwap);
+	relaySwap = dcc.GetCV(CV_relaySwap);
 
 	// read back and update servo vars from eeprom
-	servo.SetExtent(LOW,dcc.getCV(CV_servoMinTravel));
-	servo.SetExtent(HIGH,dcc.getCV(CV_servoMaxTravel));
-	servo.SetDuration(LOW,dcc.getCV(CV_servoLowSpeed) * 100);
-	servo.SetDuration(HIGH,dcc.getCV(CV_servoHighSpeed) * 100);
+	servo.SetExtent(LOW,dcc.GetCV(CV_servoMinTravel));
+	servo.SetExtent(HIGH,dcc.GetCV(CV_servoMaxTravel));
+	servo.SetDuration(LOW,dcc.GetCV(CV_servoLowSpeed) * 100);
+	servo.SetDuration(HIGH,dcc.GetCV(CV_servoHighSpeed) * 100);
 }

@@ -1,8 +1,7 @@
 
 #include <EEPROM.h>
-#include "TurnoutMgr.h"
 #include <Servo.h>
-#include <NmraDcc.h>
+#include "TurnoutMgr.h"
 
 
 TurnoutMgr TurnoutManager;
@@ -25,23 +24,14 @@ void HandleOSCurvedWrapper(bool ButtonState) { TurnoutManager.OSCurvedHandler(Bu
 // dcc lib callbacks
 // TODO: figure out how to call these directly in TurnoutManager so we don't clutter up global scope
 
-// This function is called whenever a normal DCC Turnout Packet is received
-void notifyDccAccTurnoutOutput( uint16_t Addr, uint8_t Direction, uint8_t OutputPower )
+void HandleDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte data)
 {
-	//Serial.println("In notifyDccAccTurnoutOutput callback.");
-	TurnoutManager.DCCcommandHandler(Addr, Direction);
+    TurnoutManager.DCCcommandHandler(outputAddress, data);
 }
 
-void notifyCVChange(uint16_t CV, uint8_t Value)
+void HandleDCCAccPomPacket(int boardAddress,int outputAddress, byte instructionType, int cv, byte data)
 {
-#ifdef _DEBUG
-	Serial.print("notifyCVChange: CV: ") ;
-	Serial.print(CV,DEC) ;
-	Serial.print(" Value: ") ;
-	Serial.println(Value, DEC) ;
-#endif
-
-	TurnoutManager.CVchangeHandler(CV, Value);
+    TurnoutManager.DCCPomHandler(cv, data);
 }
 
 

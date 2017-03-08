@@ -9,7 +9,7 @@
 #include "WProgram.h"
 #endif
 
-#include <NmraDcc.h>
+#include "DCC_Decoder.h"
 #include "TurnoutServo.h"
 #include "RGB_LED.h"
 #include "Button.h"
@@ -29,7 +29,7 @@ public:
 
 	// event handlers
 	void DCCcommandHandler(unsigned int Addr, unsigned int Direction);
-	void CVchangeHandler(unsigned int CV, unsigned int Value);
+	void DCCPomHandler(unsigned int CV, unsigned int Value);
 	void ButtonEventHandler(bool ButtonState);
 	void ServoMoveDoneHandler();
 	void ServoPowerOffHandler();
@@ -48,6 +48,7 @@ private:
 private:
 	// Hardware assignments
 	const byte DCCPin = 2;
+    const byte DCCInt = 0;
 	const byte ButtonPin = 3;
 	const byte ServoPowerPin = 4;
 	const byte ServoPWMPin = 5;
@@ -60,7 +61,7 @@ private:
 	const byte OScurvedPin = 17;
 
 	// Sensors and outputs
-	NmraDcc dcc;
+	DCC_Decoder dcc;
 	Button button;
 	Button osStraight;
 	Button osCurved;
@@ -101,8 +102,8 @@ private:
 	// factory default settings
 	CVPair FactoryDefaultCVs [11] =
 	{
-		{CV_ACCESSORY_DECODER_ADDRESS_LSB, 1},    // defined in nmradcc.h, default to address = 1
-		{CV_ACCESSORY_DECODER_ADDRESS_MSB, 0},    // defined in nmradcc.h
+		{kCV_AddressLSB, 1},    // defined in DCC_Decoder.h, default to address = 1
+		{kCV_AddressLSB, 0},    // defined in DCC_Decoder.h
 		{CV_servoMinTravel, 50},
 		{CV_servoMaxTravel, 110},
 		{CV_servoLowSpeed, 25},
@@ -116,6 +117,8 @@ private:
 };
 
 // event handler wrappers in main
+extern void HandleDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte data);
+extern void HandleDCCAccPomPacket(int boardAddress,int outputAddress, byte instructionType, int cv, byte data);
 extern void HandleButtonPressWrapper(bool ButtonState);
 extern void HandleServoMoveDoneWrapper();
 extern void HandleServoPowerOffWrapper();
