@@ -1,4 +1,5 @@
 
+#include <EEPROM.h>
 #include "TurnoutMgr.h"
 #include <Servo.h>
 #include <NmraDcc.h>
