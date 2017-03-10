@@ -14,7 +14,7 @@
 // Global Decoder object
 //
 
-DCC_Decoder DCC;
+//DCC_Decoder DCC;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,14 +64,19 @@ void DCC_Decoder::ShiftInterruptAlignment()
 
 ///////////////////////////////////////////////////
 
-void DCC_Decoder::StartInterrupt(byte interrupt)
+void DCC_Decoder::StartInterrupt(byte interruptPin)
 {
     gInterruptTimeIndex = 0;
     gInterruptTime[0] = gInterruptTime[1] = 0;
     gInterruptChaos = 0;
     gInterruptMicros = micros();
     
-    attachInterrupt( interrupt, DCC_Interrupt, CHANGE );
+    attachInterrupt( digitalPinToInterrupt(interruptPin), DCC_Interrupt, CHANGE );
+
+    Serial.print("interrupt setup complete on pin ");
+    Serial.print(interruptPin, DEC);
+    Serial.print(" interrupt ");
+    Serial.println(digitalPinToInterrupt(interruptPin),DEC);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -481,7 +486,7 @@ void DCC_Decoder::ProcessShortLocoPacket()
 	}
 
 	// Make callback
-	gLastPacketToThisAddress = (addressByte == DCC.ReadCV(kCV_PrimaryAddress));
+	gLastPacketToThisAddress = (addressByte == ReadCV(kCV_PrimaryAddress));
 	if( func_BaselineControlPacket_All_Packets || gLastPacketToThisAddress )
 	{
 		if( !gHandledAsRawPacket && func_BaselineControlPacket )
@@ -547,8 +552,10 @@ void DCC_Decoder::ProcessAccPacket()
 	int outputAddress = ((boardAddress << 2) | outAddr) + 1;
 	if (accType == LEGACYPOM) outputAddress = (boardAddress << 2) + 1;
 
-	gLastPacketToThisAddress = (outputAddress == DCC.Address());
+	gLastPacketToThisAddress = (outputAddress == Address());
 
+    Serial.println("processing acc packet");
+    Serial.println(Address(),DEC);
 
 	// process the packet types
 
@@ -826,30 +833,31 @@ void DCC_Decoder::State_Boot()
 //
 // SetupDecoder
 //
-void DCC_Decoder::SetupDecoder(byte mfgID, byte mfgVers, byte interrupt)  
+void DCC_Decoder::SetupDecoder(byte interruptPin, byte mfgID, byte mfgVers, byte cv29)  
 {
     if( gInterruptMicros == 0 )
     {        
-            // Save mfg info
+        // Save mfg info
         WriteCV(kCV_ManufacturerVersionNo, mfgID);
         WriteCV(kCV_ManufacturedID, mfgVers);
 
-		// TODO: store bits to indicate accessory vs multifunction, and accessory output mode
+		// store CV29 settings
+        WriteCV(kCV_ConfigurationData1, cv29);
 
-            // Attach the DCC interrupt
-        StartInterrupt(interrupt);
+        // Attach the DCC interrupt
+        StartInterrupt(interruptPin);
     
-            // Start decoder in reset state
+        // Start decoder in reset state
         GOTO_DecoderReset( kDCC_OK_BOOT );
     }
 }
 
-void DCC_Decoder::SetupMonitor(byte interrupt)
+void DCC_Decoder::SetupMonitor(byte interruptPin)
 {
     if( gInterruptMicros == 0 )
     {        
             // Attach the DCC interrupt
-        StartInterrupt(interrupt);
+        StartInterrupt(interruptPin);
         
             // Start decoder in reset state
         GOTO_DecoderReset( kDCC_OK_BOOT );    

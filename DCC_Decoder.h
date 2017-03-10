@@ -65,6 +65,24 @@
     // CV 1..256 are supported
 #define kCV_MAX                       257
 
+
+// CV29 bits  (from NmraDcc.h)
+enum CV29bits {
+    CV29_LOCO_DIR            = 0x01, // bit 0: Locomotive Direction: "0" = normal, "1" = reversed
+    CV29_F0_LOCATION         = 0x02, // bit 1: F0 location: "0" = bit 4 in Speed and Direction instructions, 
+                                     //        "1" = bit 4 in function group one instruction
+    CV29_APS				 = 0x04, // bit 2: Alternate Power Source (APS) "0" = NMRA Digital only, 
+                                     //        "1" = Alternate power source set by CV12
+    CV29_ADV_ACK             = 0x08, // bit 3: ACK, Advanced Acknowledge mode enabled if 1, disabled if 0
+    CV29_SPEED_TABLE_ENABLE  = 0x10, // bit 4: STE, Speed Table Enable, "0" = values in CVs 2, 4 and 6, 
+                                     //        "1" = Custom table selected by CV 25
+    CV29_EXT_ADDRESSING      = 0x20, // bit 5: "0" = one byte addressing, "1" = two byte addressing
+    CV29_OUTPUT_ADDRESS_MODE = 0x40, // bit 6: "0" = Decoder Address Mode, "1" = Output Address Mode
+    CV29_ACCESSORY_DECODER   = 0x80, // bit 7: "0" = Multi-Function Decoder Mode, "1" = Accessory Decoder Mode
+};
+
+
+
 ///////////////////////////////////////////////////////////////////////////////////////
 
 typedef boolean (*RawPacket)(byte byteCount, byte* packetBytes);
@@ -159,10 +177,10 @@ public:
     DCC_Decoder();
     
         // Called from setup in Arduino Sketch. Set mfgID, mfgVers and interrupt. Call one SetupXXX
-    void SetupDecoder(byte mfgID, byte mfgVers, byte interrupt);    // Used for Decoder
-    void SetupMonitor(byte interrupt);                              // Used when building a monitor
+    void SetupDecoder(byte interruptPin, byte mfgID, byte mfgVers, byte cv29);    // Used for Decoder
+    void SetupMonitor(byte interruptPin);                              // Used when building a monitor
     
-        // All packets are sent to RawPacketHandler. Return true to stop dispatching to other handlers.
+        // All packets are sent to RawPacketHandler. Return , to stop dispatching to other handlers.
     void SetRawPacketHandler(RawPacket func);
     
         // S 9.2 defines two special packets. Idle and reset.
@@ -185,7 +203,7 @@ public:
 	void SetCVUpdateHandler(CVUpdateCallback func);
     
         // Helper function to read decoder address
-    int Address();
+    static int Address();
     
         // Call at least once from mainloop. Not calling frequently enough and library will miss data bits!
     void loop();
@@ -297,7 +315,7 @@ private:
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-//extern DCC_Decoder DCC;
+//extern DCC_Decoder dcc;
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
