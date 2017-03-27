@@ -37,50 +37,44 @@ void HandleDCCAccPomPacket(int boardAddress,int outputAddress, byte instructionT
 
 
 // ========================================================================================================
-// millis timer interrupt
-SIGNAL(TIMER0_COMPA_vect)
-{
-	TurnoutManager.UpdateSensors();
-}
-
-
-
-// ========================================================================================================
 // main setup
 void setup()
 {
-	Serial.begin(115200);
+    // initialize the turnout manager
+    TurnoutManager.Initialize();
 
-	// Set up interrupt for Timer0.
-	// See https://learn.adafruit.com/multi-tasking-the-arduino-part-2/timers
-	OCR0A = 0xAF;
-	TIMSK0 |= _BV(OCIE0A);
+#ifdef _DEBUG
+    Serial.begin(115200);
 
-	// initialize the turnout manager
-	TurnoutManager.Initialize();
+    // for timing tests
+    pinMode(10,OUTPUT);
+    pinMode(11,OUTPUT);
+#endif
 }
 
 
-
+// values for 'timer' used below
 unsigned long loopCount = 0;
-unsigned long loopCountStartTime = 0;
-unsigned long loopInterval = 1000;
+unsigned long loopInterval = 250;   // yields ~1.5ms interval
+
 
 // ========================================================================================================
 // main loop
 void loop()
 {
-#ifdef _DEBUG
-	loopCount++;
-	if ((millis() - loopCountStartTime) > loopInterval)
-	{
-		Serial.print("loop count = ");
-		Serial.println(loopCount,DEC);
-		loopCountStartTime = millis();
-		loopCount = 0;
-	}
+    // DCC heartbeat process
+    TurnoutManager.UpdateDccProcess();
 
-#endif
+    // hokey 'timer' for sensor/button/servo heartbeat functions
+    // we don't use a timer interrupt so that the h/w int for DCC is as accurate as possible
+    loopCount++;
+    if (loopCount > loopInterval)
+    {
+        // for testing timing
+        //PORTB |= (1 << 2);     // pulse output pin 10
+        //PORTB &= ~(1 << 2);
 
-	TurnoutManager.UpdateDccProcess();
+        TurnoutManager.UpdateSensors();
+        loopCount = 0;
+    }
 }
