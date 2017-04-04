@@ -29,7 +29,7 @@ public:
 
 	// event handlers
 	void DCCcommandHandler(unsigned int Addr, unsigned int Direction);
-	void DCCPomHandler(unsigned int CV, unsigned int Value);
+	void DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value);
 	void ButtonEventHandler(bool ButtonState);
 	void ServoMoveDoneHandler();
 	void ServoPowerOffHandler();
@@ -48,13 +48,12 @@ private:
 private:
 	// Hardware assignments
 	const byte DCCPin = 2;
-    const byte DCCInt = 0;
 	const byte ButtonPin = 3;
 	const byte ServoPowerPin = 4;
 	const byte ServoPWMPin = 5;
-	const byte LedPinR = 6;
-	const byte LedPinG = 7;
-	const byte LedPinB = 8;
+	const byte LedPinR = 7;
+	const byte LedPinG = 8;
+	const byte LedPinB = 6;
 	const byte RelayStraightPin = 14;
 	const byte RelayCurvedPin = 15;
 	const byte OSstraightPin = 16;
@@ -102,8 +101,8 @@ private:
 	// factory default settings
 	CVPair FactoryDefaultCVs [11] =
 	{
-		{kCV_AddressLSB, 1},    // defined in DCC_Decoder.h, default to address = 1
-		{kCV_AddressLSB, 0},    // defined in DCC_Decoder.h
+		{kCV_AddressLSB, 20},    // defined in DCC_Decoder.h, default to address = 1
+		{kCV_AddressMSB, 0},    // defined in DCC_Decoder.h
 		{CV_servoMinTravel, 50},
 		{CV_servoMaxTravel, 110},
 		{CV_servoLowSpeed, 25},
