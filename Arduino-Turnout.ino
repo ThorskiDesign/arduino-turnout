@@ -31,7 +31,7 @@ void HandleDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte
 
 void HandleDCCAccPomPacket(int boardAddress,int outputAddress, byte instructionType, int cv, byte data)
 {
-    TurnoutManager.DCCPomHandler(cv, data);
+    TurnoutManager.DCCPomHandler(outputAddress, instructionType, cv, data);
 }
 
 
@@ -70,9 +70,12 @@ void loop()
     loopCount++;
     if (loopCount > loopInterval)
     {
+
+#ifdef _DEBUG
         // for testing timing
         //PORTB |= (1 << 2);     // pulse output pin 10
         //PORTB &= ~(1 << 2);
+#endif
 
         TurnoutManager.UpdateSensors();
         loopCount = 0;

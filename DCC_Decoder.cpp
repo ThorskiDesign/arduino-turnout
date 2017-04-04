@@ -37,9 +37,11 @@ volatile unsigned int  DCC_Decoder::gInterruptChaos;
 
 void DCC_Decoder::DCC_Interrupt()    // static, this is our ISR
 {
+#ifdef _DEBUG
     // for testing interrupt timing/consistency
     //PORTB |= (1 << 2);     // pulse output pin 10
     //PORTB &= ~(1 << 2);
+#endif
 
     unsigned long ms = micros();
     gInterruptTime[gInterruptTimeIndex] = ms - gInterruptMicros;
@@ -684,13 +686,14 @@ void DCC_Decoder::State_ReadPreamble()
 //
 void DCC_Decoder::State_Reset()
 {    
+#ifdef _DEBUG
     // test for timing error issues - pulses pin 10 if we didn't get a 1 or 0
     if (gResetReason == kDCC_ERR_NOT_0_OR_1)
     {
        PORTB |= (1 << 2);     // pulse output pin 10
        PORTB &= ~(1 << 2);
     }
-
+#endif
      
      // EngineReset Handler  (Debugging)
     if( func_DecodingEngineCompletion )
