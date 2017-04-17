@@ -12,7 +12,7 @@
 class RelayClass
 {
 public:
-	RelayClass(byte Pin);
+	explicit RelayClass(byte Pin);
 	void SetRelay(bool State);
 	bool GetState();
 

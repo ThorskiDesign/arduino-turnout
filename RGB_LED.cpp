@@ -27,7 +27,6 @@ void RgbLed::SetLED(ColorType C, ModeType T)
 {
 	if (C == ledColor && T == ledMode) return;
 
-	//Serial.print("color: "); Serial.println(C, DEC);
 	ledColor = C;
 	ledMode = T;
 	if (ledMode == ON) TurnColorsOn();

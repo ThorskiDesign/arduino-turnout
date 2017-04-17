@@ -12,7 +12,7 @@ EventTimer::EventTimer()
 void EventTimer::StartTimer(unsigned int Duration)
 {
 	duration = Duration;
-	stopTime = millis() + duration;
+	startTime = millis();
 	isActive = true;
 }
 
@@ -21,7 +21,7 @@ void EventTimer::StartTimer(unsigned int Duration)
 void EventTimer::Update(unsigned long CurrentMillis)
 {
 	// has the duration elapsed
-	if (isActive && (CurrentMillis > stopTime))
+	if (isActive && (CurrentMillis - startTime > duration))
 	{
 		// disable timer
 		isActive = false;
@@ -44,4 +44,4 @@ bool EventTimer::IsActive() { return isActive; }
 
 
 // set the handler for the timer event
-void EventTimer::SetTimerHandler(void (*Handler)()) { timerHandler = Handler; }
+void EventTimer::SetTimerHandler(EventTimerHandlerFunc Handler) { timerHandler = Handler; }

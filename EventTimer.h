@@ -12,18 +12,20 @@
 class EventTimer
 {
 public:
-	EventTimer();
+    typedef void (*EventTimerHandlerFunc)();
+
+    EventTimer();
 	void StartTimer(unsigned int Duration);
 	void Update(unsigned long CurrentMillis);
 	void Update();
 	bool IsActive();
-	void SetTimerHandler(void (*Handler)());
+	void SetTimerHandler(EventTimerHandlerFunc Handler);
 
 private:
-	unsigned long stopTime = 0;
+	unsigned long startTime = 0;
 	unsigned long duration = 0;
 	bool isActive = false;
-	void (*timerHandler)();   // pointer to handler for the timer event
+	EventTimerHandlerFunc timerHandler = 0;   // pointer to handler for the timer event
 };
 
 #endif

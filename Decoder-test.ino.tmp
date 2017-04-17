@@ -1,0 +1,140 @@
+
+#include "DCCpacket.h"
+#include "Bitstream.h"
+#include <EEPROM.h>
+#include <Servo.h>
+#include "DCCdecoder.h"
+
+
+// Bitstream setup ==========================================================================
+
+// global stuff
+const byte intPin = 2;
+BitStream bitStream(intPin, false, 48, 68, 88, 10000, 10);
+DCCpacket dccpacket(true, true, 250);
+DCCdecoder dcc;
+
+boolean haveNewBits = false;
+boolean currentBit = 0;
+volatile unsigned long bits = 0;
+byte numBits = 0;
+int y = 0;
+
+
+// called when the next 32 bits from the bitstream are ready
+void BitStreamHandler(unsigned long incomingBits)
+{
+    noInterrupts();   // disable interrupts here, but shouldn't affect next dcc pulse, since this will be right after one
+    bits = incomingBits;
+    interrupts();
+
+    haveNewBits = true;
+}
+
+
+void BitErrorHandler(byte errorCode)
+{
+    Serial.print("Bit error, code: ");
+    Serial.println(errorCode,DEC);
+}
+
+
+// called when an assembled packet is ready
+void MainPacketHandler(byte *packetData, byte size)
+{
+    dcc.ProcessPacket(packetData, size);
+}
+
+
+void MainPacketErrorHandler(byte errorCode)
+{
+    Serial.print("Packet error, code: ");
+    Serial.println(errorCode,DEC);
+}
+
+
+void DCC_AccessoryDecoderHandler(int boardAddress, int outputAddress, byte activate, byte data)
+{
+    Serial.print("Basic Acc Packet, Board Address: ");
+    Serial.print(boardAddress, DEC);
+    Serial.print("  Output Address: ");
+    Serial.print(outputAddress, DEC);
+    Serial.print("  Activate Bit: ");
+    Serial.print(activate,DEC);
+    Serial.print("  Data: ");
+    Serial.println(data,DEC);
+}
+
+
+void DCC_ExtendedAccDecoderHandler(int boardAddress, int outputAddress, byte data)
+{
+    Serial.print("Ext Acc Packet, Board Address: ");
+    Serial.print(boardAddress, DEC);
+    Serial.print("  Output Address: ");
+    Serial.print(outputAddress, DEC);
+    Serial.print("  Data: ");
+    Serial.println(data,DEC);
+}
+
+
+void DCC_BaselineControlHandler(int address, int speed, int direction)
+{
+    Serial.print("Baseline Packet, Loco Address: ");
+    Serial.print(address, DEC);
+    Serial.print("  Speed: ");
+    Serial.print(speed, DEC);
+    Serial.print("  Direction: ");
+    Serial.println(direction,DEC);
+}
+
+
+void DCC_AccPomHandler(int boardAddress,int outputAddress, byte instructionType, int cv, byte data)
+{
+    Serial.print("Basic Acc POM Packet, Board Address: ");
+    Serial.print(boardAddress, DEC);
+    Serial.print("  Output Address: ");
+    Serial.print(outputAddress, DEC);
+    Serial.print("  Instruction Type: ");
+    Serial.print(instructionType,DEC);
+    Serial.print("  CV: ");
+    Serial.print(cv,DEC);
+    Serial.print("  Data: ");
+    Serial.println(data,DEC);
+}
+
+
+
+
+// Setup  =================================================================
+//
+void setup()
+{
+    Serial.begin(115200);
+
+    bitStream.SetDataFullHandler(&BitStreamHandler);
+    bitStream.SetErrorHandler(&BitErrorHandler);
+
+    dccpacket.SetPacketCompleteHandler(&MainPacketHandler);
+    dccpacket.SetPacketErrorHandler(&MainPacketErrorHandler);
+
+    dcc.SetupDecoder(0,0,0,true);
+    dcc.SetBasicAccessoryDecoderPacketHandler(&DCC_AccessoryDecoderHandler);
+    dcc.SetExtendedAccessoryDecoderPacketHandler(&DCC_ExtendedAccDecoderHandler);
+    dcc.SetBaselineControlPacketHandler(&DCC_BaselineControlHandler);
+    dcc.SetBasicAccessoryPomPacketHandler(&DCC_AccPomHandler);
+
+    pinMode(12, OUTPUT);
+}
+
+
+
+// Main loop   =======================================================================
+
+void loop()
+{
+    if (haveNewBits)
+    {
+        dccpacket.ProcessIncomingBits(bits);
+        haveNewBits = false;
+    }
+}

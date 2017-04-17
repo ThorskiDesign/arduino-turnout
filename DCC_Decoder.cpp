@@ -9,32 +9,24 @@
 #include "DCC_Decoder.h"
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Global Decoder object
-//
-
-DCC_Decoder DCC;
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // NMRA DCC Definitions
 //
-    // Microsecond 0 & 1 timings 
-#define    kONE_Min         52
-#define    kONE_Max         64
 
-#define    kZERO_Min        90
+    // Microsecond 0 & 1 timings 
+#define    kONE_Min         46     // 58 +/- 12, rather than +/- 6 as per DCC spec
+#define    kONE_Max         70     // due to interrupt (+/-6) and micros (+/-4) timing considerations
+
+#define    kZERO_Min        88     // 100 +/- 12, as above
 #define    kZERO_Max        10000
 
     // Minimum preamble length
 #define    kPREAMBLE_MIN    10
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Interrupt handling
+// Interrupt handling, these are static
 //
 unsigned long          DCC_Decoder::gInterruptMicros = 0;
 byte                   DCC_Decoder::gInterruptTimeIndex = 0;
@@ -43,8 +35,14 @@ volatile unsigned int  DCC_Decoder::gInterruptChaos;
 
 ///////////////////////////////////////////////////
 
-void DCC_Decoder::DCC_Interrupt()
+void DCC_Decoder::DCC_Interrupt()    // static, this is our ISR
 {
+#ifdef _DEBUG
+    // for testing interrupt timing/consistency
+    //PORTB |= (1 << 2);     // pulse output pin 10
+    //PORTB &= ~(1 << 2);
+#endif
+
     unsigned long ms = micros();
     gInterruptTime[gInterruptTimeIndex] = ms - gInterruptMicros;
     gInterruptMicros = ms;
@@ -64,56 +62,17 @@ void DCC_Decoder::ShiftInterruptAlignment()
 
 ///////////////////////////////////////////////////
 
-void DCC_Decoder::StartInterrupt(byte interrupt)
+void DCC_Decoder::StartInterrupt(byte interruptPin)
 {
     gInterruptTimeIndex = 0;
     gInterruptTime[0] = gInterruptTime[1] = 0;
     gInterruptChaos = 0;
     gInterruptMicros = micros();
     
-    attachInterrupt( interrupt, DCC_Interrupt, CHANGE );
+    attachInterrupt( digitalPinToInterrupt(interruptPin), DCC_Interrupt, CHANGE );
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Globals
-//
-typedef void(*StateFunc)();
 
-    // Current state function pointer
-StateFunc       DCC_Decoder::gState;                   // Current state function pointer
-
-    // Timing data from last interrupt
-unsigned int    DCC_Decoder::gLastChaos;                  // Interrupt chaos count we processed
-
-    // Preamble bit count
-int             DCC_Decoder::gPreambleCount;              // Bit count for reading preamble
-
-    // Reset reason 
-byte            DCC_Decoder::gResetReason;                // Result code of last reason decoder was reset
-boolean         DCC_Decoder::gHandledAsRawPacket;
-
-    // Packet data
-PacketType		DCC_Decoder::gPacketType;                 // the packet type.
-byte            DCC_Decoder::gPacket[kPACKET_LEN_MAX];    // The packet data.
-byte            DCC_Decoder::gPacketIndex;                // Byte index to write to.
-byte            DCC_Decoder::gPacketMask;                 // Bit index to write to. 0x80,0x40,0x20,...0x01
-boolean         DCC_Decoder::gPacketEndedWith1;           // Set true if packet ended on 1. Spec requires that the 
-                                                          // packet end bit can count as a bit in next preamble. 
-    // CV Storage
-//byte            DCC_Decoder::gCV[kCV_MAX];                // CV Storage (TODO - Move to PROGMEM)
-
-    // Packet arrival timing
-unsigned long   DCC_Decoder::gThisPacketMS;               // Milliseconds of this packet being parsed
-boolean         DCC_Decoder::gLastPacketToThisAddress;    // Was last pack processed to this decoder's address?
-
-unsigned long   DCC_Decoder::gLastValidPacketMS;          // Milliseconds of last valid packet
-unsigned long   DCC_Decoder::gLastValidPacketToAddressMS; // Milliseconds of last valid packet to this decoder
-unsigned long   DCC_Decoder::gLastValidIdlePacketMS;      // Milliseconds of last valid idle packet
-unsigned long   DCC_Decoder::gLastValidResetPacketMS;     // Milliseconds of last valid reset packet
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Packet Timing Support
@@ -140,12 +99,9 @@ unsigned long DCC_Decoder::MillisecondsSinceLastResetPacket()
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // CV Support
 //
-
-CVUpdateCallback DCC_Decoder::func_CVUpdateCallback = NULL;
 
 void DCC_Decoder::SetCVUpdateHandler(CVUpdateCallback func)
 {
@@ -199,34 +155,32 @@ int DCC_Decoder::Address()
 {
 	int address;
 
-	byte cv29 = DCC_Decoder::ReadCV(kCV_ConfigurationData1);
+	byte cv29 = ReadCV(kCV_ConfigurationData1);
 
 	if( cv29 & 0x80 )   // Is this an accessory decoder?
 	{
-		address = DCC_Decoder::ReadCV(kCV_AddressMSB)<<6 | DCC_Decoder::ReadCV(kCV_AddressLSB);        
+		address = ReadCV(kCV_AddressMSB)<<6 | ReadCV(kCV_AddressLSB);        
 	}
 	else
 	{
 		if( cv29 & 0x20 )   // Multifunction using extended addresses?
 		{
-			address = DCC_Decoder::ReadCV(kCV_ExtendedAddress1)<<8 | DCC_Decoder::ReadCV(kCV_ExtendedAddress2);        
+			address = ReadCV(kCV_ExtendedAddress1)<<8 | ReadCV(kCV_ExtendedAddress2);        
 		}
 		else
 		{
-			address = DCC_Decoder::ReadCV(kCV_PrimaryAddress);
+			address = ReadCV(kCV_PrimaryAddress);
 		}
 	}
 
 	return address;
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Handlers
+// Set callback handlers
 //
-BaselineControlPacket DCC_Decoder::func_BaselineControlPacket = NULL;
-boolean               DCC_Decoder::func_BaselineControlPacket_All_Packets = false;
 
 void DCC_Decoder::SetBaselineControlPacketHandler(BaselineControlPacket func, boolean allPackets)
 {
@@ -234,21 +188,12 @@ void DCC_Decoder::SetBaselineControlPacketHandler(BaselineControlPacket func, bo
     func_BaselineControlPacket_All_Packets = allPackets;
 }
 
-//////////////////////////////////////////////////////////////
-
-RawPacket DCC_Decoder::func_RawPacket = NULL;
 
 void DCC_Decoder::SetRawPacketHandler(RawPacket func)
 {
     func_RawPacket = func;
 }
 
-//////////////////////////////////////////////////////////////
-
-BasicAccDecoderPacket DCC_Decoder::func_BasicAccPacket = NULL;
-AccDecoderPomPacket   DCC_Decoder::func_BasicAccPomPacket = NULL;
-boolean               DCC_Decoder::func_BasicAccPacket_All_Packets = false;
-AccDecoderPomPacket   DCC_Decoder::func_LegacyAccPomPacket = NULL;
 
 void DCC_Decoder::SetBasicAccessoryDecoderPacketHandler(BasicAccDecoderPacket func, boolean allPackets)
 {
@@ -266,13 +211,6 @@ void DCC_Decoder::SetLegacyAccessoryPomPacketHandler(AccDecoderPomPacket func)
 	func_LegacyAccPomPacket = func;
 }
 
-
-//////////////////////////////////////////////////////////////
-
-ExtendedAccDecoderPacket DCC_Decoder::func_ExtdAccPacket = NULL;
-AccDecoderPomPacket      DCC_Decoder::func_ExtdAccPomPacket = NULL;
-boolean                  DCC_Decoder::func_ExtdAccPacket_All_Packets = false;
-
 void DCC_Decoder::SetExtendedAccessoryDecoderPacketHandler(ExtendedAccDecoderPacket func, boolean allPackets)
 {
     func_ExtdAccPacket = func;
@@ -284,27 +222,18 @@ void DCC_Decoder::SetExtendedAccessoryPomPacketHandler(AccDecoderPomPacket func)
     func_ExtdAccPomPacket = func;
 }
 
-//////////////////////////////////////////////////////////////
-
-IdleResetPacket DCC_Decoder::func_IdlePacket = NULL;
 
 void DCC_Decoder::SetIdlePacketHandler(IdleResetPacket func)
 {
     func_IdlePacket = func;
 }
 
-//////////////////////////////////////////////////////////////
-
-IdleResetPacket DCC_Decoder::func_ResetPacket = NULL;
 
 void DCC_Decoder::SetResetPacketHandler(IdleResetPacket func)
 {
     func_ResetPacket = func;
 }
 
-//////////////////////////////////////////////////////////////
-
-DecodingEngineCompletion DCC_Decoder::func_DecodingEngineCompletion = NULL;
 
 void DCC_Decoder::SetDecodingEngineCompletionStatusHandler(DecodingEngineCompletion func)
 {
@@ -314,16 +243,15 @@ void DCC_Decoder::SetDecodingEngineCompletionStatusHandler(DecodingEngineComplet
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // State Change Macros
 //
-#define GOTO_DecoderReset(reason) { gState = DCC_Decoder::State_Reset; gResetReason = reason; return; }
-#define GOTO_ExecutePacket()      { gState = DCC_Decoder::State_Execute; return; }
-#define GOTO_ReadPacketState()    { gState = DCC_Decoder::State_ReadPacket; return; }
-#define GOTO_PreambleState()      { gState = DCC_Decoder::State_ReadPreamble; return; }
+#define GOTO_DecoderReset(reason) { gState = &DCC_Decoder::State_Reset; gResetReason = reason; return; }
+#define GOTO_ExecutePacket()      { gState = &DCC_Decoder::State_Execute; return; }
+#define GOTO_ReadPacketState()    { gState = &DCC_Decoder::State_ReadPacket; return; }
+#define GOTO_PreambleState()      { gState = &DCC_Decoder::State_ReadPreamble; return; }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Execute packet
@@ -339,7 +267,6 @@ void DCC_Decoder::State_Execute()
         GOTO_DecoderReset( kDCC_ERR_DETECTION_FAILED );
     }
     
-
 	////////////////////////////////////////////////////////////
 	// Determine the packet type
 	// loop through packet specs and check against current packet
@@ -481,7 +408,7 @@ void DCC_Decoder::ProcessShortLocoPacket()
 	}
 
 	// Make callback
-	gLastPacketToThisAddress = (addressByte == DCC.ReadCV(kCV_PrimaryAddress));
+	gLastPacketToThisAddress = (addressByte == ReadCV(kCV_PrimaryAddress));
 	if( func_BaselineControlPacket_All_Packets || gLastPacketToThisAddress )
 	{
 		if( !gHandledAsRawPacket && func_BaselineControlPacket )
@@ -547,8 +474,7 @@ void DCC_Decoder::ProcessAccPacket()
 	int outputAddress = ((boardAddress << 2) | outAddr) + 1;
 	if (accType == LEGACYPOM) outputAddress = (boardAddress << 2) + 1;
 
-	gLastPacketToThisAddress = (outputAddress == DCC.Address());
-
+	gLastPacketToThisAddress = (outputAddress == Address());
 
 	// process the packet types
 
@@ -725,7 +651,7 @@ void DCC_Decoder::State_ReadPacket()
 //
 void DCC_Decoder::State_ReadPreamble()
 {     
-    // Interrupt header
+   // Interrupt header
     StandardInterruptHeader();
     
     // If we get here, booleans aIs1 and bIs1 are set to the two halves of the next bit.
@@ -760,7 +686,16 @@ void DCC_Decoder::State_ReadPreamble()
 //
 void DCC_Decoder::State_Reset()
 {    
-        // EngineReset Handler  (Debugging)
+#ifdef _DEBUG
+    // test for timing error issues - pulses pin 10 if we didn't get a 1 or 0
+    if (gResetReason == kDCC_ERR_NOT_0_OR_1)
+    {
+       PORTB |= (1 << 2);     // pulse output pin 10
+       PORTB &= ~(1 << 2);
+    }
+#endif
+     
+     // EngineReset Handler  (Debugging)
     if( func_DecodingEngineCompletion )
     {
         (func_DecodingEngineCompletion)(gHandledAsRawPacket ? kDCC_OK_MAX : gResetReason);
@@ -826,30 +761,31 @@ void DCC_Decoder::State_Boot()
 //
 // SetupDecoder
 //
-void DCC_Decoder::SetupDecoder(byte mfgID, byte mfgVers, byte interrupt)  
+void DCC_Decoder::SetupDecoder(byte interruptPin, byte mfgID, byte mfgVers, byte cv29)  
 {
     if( gInterruptMicros == 0 )
     {        
-            // Save mfg info
+        // Save mfg info
         WriteCV(kCV_ManufacturerVersionNo, mfgID);
         WriteCV(kCV_ManufacturedID, mfgVers);
 
-		// TODO: store bits to indicate accessory vs multifunction, and accessory output mode
+		// store CV29 settings
+        WriteCV(kCV_ConfigurationData1, cv29);
 
-            // Attach the DCC interrupt
-        StartInterrupt(interrupt);
+        // Attach the DCC interrupt
+        StartInterrupt(interruptPin);
     
-            // Start decoder in reset state
+        // Start decoder in reset state
         GOTO_DecoderReset( kDCC_OK_BOOT );
     }
 }
 
-void DCC_Decoder::SetupMonitor(byte interrupt)
+void DCC_Decoder::SetupMonitor(byte interruptPin)
 {
     if( gInterruptMicros == 0 )
     {        
             // Attach the DCC interrupt
-        StartInterrupt(interrupt);
+        StartInterrupt(interruptPin);
         
             // Start decoder in reset state
         GOTO_DecoderReset( kDCC_OK_BOOT );    
@@ -863,7 +799,7 @@ void DCC_Decoder::SetupMonitor(byte interrupt)
 //
 void DCC_Decoder::loop()
 {
-    (gState)();
+    (this->*gState)();   // call state function pointed to by gstate
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -873,8 +809,9 @@ void DCC_Decoder::loop()
 //
 DCC_Decoder::DCC_Decoder() 
 {
-    gState = DCC_Decoder::State_Boot;
+    gState = &DCC_Decoder::State_Boot;
 }
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,7 +12,9 @@
 class Button
 {
 public:
-	Button(byte Pin, bool EnablePullup);
+    typedef void (*ButtonPressHandlerFunc)(bool switchState);
+
+    Button(byte Pin, bool EnablePullup);
 	void Update(unsigned long CurrentMillis);
 	void Update();
 	byte SwitchState();
@@ -20,7 +22,7 @@ public:
 	int NumUpdates();
 	int NumInterrupts();
 	bool HasChanged();
-	void SetButtonPressHandler(void (*Handler)(bool));
+	void SetButtonPressHandler(ButtonPressHandlerFunc Handler);
 
 private:
 	bool readEnable = false;            // enable reading the switch after debounce interval
@@ -32,7 +34,7 @@ private:
 	int numUpdates = 0;                 // number of times the debounced state has changed
 	int numInterrupts = 0;              // number of times the raw state has changed
 	bool hasChanged = false;            // has the state of the switch changed (this is reset after reading the value)
-	void (*buttonPressHandler)(bool);   // pointer to handler for button press event
+	ButtonPressHandlerFunc buttonPressHandler = 0;   // pointer to handler for button press event
 };
 
 #endif

@@ -1,0 +1,87 @@
+
+#include <EEPROM.h>
+#include <Servo.h>
+#include "Bitstream.h"
+
+
+// global stuff
+const byte intPin = 2;
+BitStream bitStream(intPin, false, 48, 68, 88, 10000, 0);
+
+boolean haveNewBits = false;
+boolean currentBit = 0;
+volatile unsigned long bits = 0;
+byte numBits = 0;
+int y = 0;
+unsigned long errorCount = 0;
+
+
+void BitStreamHandler(unsigned long incomingBits)
+{
+    noInterrupts();   // disable interrupts here, but shouldn't affect next dcc pulse, since this will be right after one
+    bits = incomingBits;
+    interrupts();
+
+    haveNewBits = true;
+}
+
+
+void BitErrorHandler(byte errorCode)
+{
+    errorCount++;
+}
+
+
+void setup()
+    // put your setup code here, to run once:
+{
+    // for testing timing
+    pinMode(12, OUTPUT);
+
+    Serial.begin(115200);
+
+    bitStream.SetDataFullHandler(&BitStreamHandler);
+    bitStream.SetErrorHandler(&BitErrorHandler);
+
+    bitStream.Resume();
+}
+
+
+unsigned long lastMillis = 0;
+unsigned long lastMillis2 = 0;
+
+void loop()
+    // put your main code here, to run repeatedly:
+{
+    unsigned long currentMillis = millis();
+
+    // test suspend/resume
+    if (currentMillis - lastMillis2 > 5000)
+    {
+        Serial.println("Suspend/Resume");
+        bitStream.Suspend();
+        bitStream.Resume();
+        lastMillis2 = currentMillis;
+    }
+
+    // print debug info
+    if (currentMillis - lastMillis > 1000)
+    {
+        lastMillis = currentMillis;
+
+        int j = 1;
+        for (int i = 0; i < 32; i++)
+            //for (unsigned long mask = 0x80000000; mask; mask >>=1)
+        {
+            unsigned long mask = (1ul << i);
+            Serial.print((mask & bits) ? '1' : '0');
+            if (j % 4 == 0) Serial.print(" ");
+            j++;
+        }
+
+        Serial.print("      Errors: ");
+        Serial.println(errorCount, DEC);
+
+        errorCount = 0;
+    }
+}
