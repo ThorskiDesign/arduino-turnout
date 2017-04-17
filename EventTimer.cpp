@@ -44,4 +44,4 @@ bool EventTimer::IsActive() { return isActive; }
 
 
 // set the handler for the timer event
-void EventTimer::SetTimerHandler(void (*Handler)()) { timerHandler = Handler; }
+void EventTimer::SetTimerHandler(EventTimerHandlerFunc Handler) { timerHandler = Handler; }
