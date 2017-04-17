@@ -27,14 +27,14 @@
 #define ERR_EXCEEDED_HISTORY_SIZE   4
 
 
-typedef void (*PacketCompleteHandler)(byte *Packet, byte PacketSize);
-typedef void (*PacketErrorHandler)(byte ErrorCode);
-
 
 class DCCpacket
 {
 
 public:
+    typedef void (*PacketCompleteHandler)(byte *Packet, byte PacketSize);
+    typedef void (*PacketErrorHandler)(byte ErrorCode);
+
     DCCpacket();
     DCCpacket(boolean EnableChecksum, boolean FilterRepeats, unsigned int FilterInterval);
     void ProcessIncomingBits(unsigned long incomingBits);
@@ -70,11 +70,12 @@ private:
     PacketErrorHandler packetErrorHandler;
 
     // state and packet vars
+    unsigned long dataBits;        // the source bit data
     State state;                   // current processing state
     byte packetIndex;              // packet byte that we're on
     byte packetMask;               // mask for assigning bits to packet bytes
     byte packet[PACKET_LEN_MAX + 1];   // packet data
-    byte currentBit;               // the current bit extracted from the input stream
+    boolean currentBit;               // the current bit extracted from the input stream
     byte preambleBitCount;         // count of consecutive 1's we've found while looking for preamble
 
     boolean enableChecksum;        // require valid checksum in order to return packet

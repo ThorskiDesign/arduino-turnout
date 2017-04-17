@@ -4,6 +4,7 @@
 // set up the packet builder
 DCCpacket::DCCpacket()
 {
+    dataBits = 0;
     state = READPREAMBLE;         // current processing state
     packetIndex = 0;              // packet byte that we're on
     packetMask = 0x80;            // mask for assigning bits to packet bytes
@@ -15,20 +16,15 @@ DCCpacket::DCCpacket()
     enableChecksum = true;        // require valid checksum in order to return packet
     filterRepeatPackets = true;   // filter out repeated packets, sending only the first in the given interval
     filterInterval = 250;         // time period (ms) within which packets are considered repeats
+
+    packetCompleteHandler = 0;    // pointers to callback functions
+    packetErrorHandler = 0;
 }
 
 
 // set up the packet builder with specified checksum and filter settings
-DCCpacket::DCCpacket(boolean EnableChecksum, boolean FilterRepeats, unsigned int FilterInterval)
+DCCpacket::DCCpacket(boolean EnableChecksum, boolean FilterRepeats, unsigned int FilterInterval) : DCCpacket()
 {
-    state = READPREAMBLE;         // current processing state
-    packetIndex = 0;              // packet byte that we're on
-    packetMask = 0x80;            // mask for assigning bits to packet bytes
-    preambleBitCount = 0;         // count of consecutive 1's we've found while looking for preamble
-
-    packetLog[0].packetSize = 0;  // initialize packet history
-    packetLog[0].packetTime = 0;
-
     enableChecksum = EnableChecksum;         // require valid checksum in order to return packet
     filterRepeatPackets = FilterRepeats;     // filter out repeated packets, sending only the first in the given interval
     filterInterval = FilterInterval;         // time period (ms) within which packets are considered repeats
@@ -62,16 +58,17 @@ void DCCpacket::FilterRepeatPackets(boolean Filter)
 // process an incoming sequence of 32 bits, stored in an unsigned long
 void DCCpacket::ProcessIncomingBits(unsigned long incomingBits)
 {
-    HW_DEBUG_PULSE_ON();
+    // we get a new set of bits from the DCC bitstream about every 5ms.
+    // takes approx 120-140 us to process a set of bits, excluding callbacks and repeat filtering,
+    // or 150-250 us with repeat filtering enabled.
 
-    // approx 120-140 us to process a set of bits, excluding callbacks and repeat filtering
-    // gets hit about every 5ms
+    dataBits = incomingBits;
 
     // process each bit in turn
     for (unsigned long mask = 0x80000000; mask; mask >>=1)
     {
         // get the current bit
-        currentBit = (incomingBits & mask) ? 1 : 0;
+        currentBit = (dataBits & mask) ? 1 : 0;
 
         // process depending on the state we're in
         switch (state)
@@ -84,8 +81,6 @@ void DCCpacket::ProcessIncomingBits(unsigned long incomingBits)
             break;
         }
     }
-
-    HW_DEBUG_PULSE_OFF();
 }
 
 
@@ -214,10 +209,10 @@ void DCCpacket::Reset()
 // check for repeat packets within a certain time interval. returns true if a match is found.
 // updating of the packet history removes packets that are outside the time interval, and ensures that
 // the most common packets are at the front of the list
-
-// TODO: check timing on this
 boolean DCCpacket::IsRepeatPacket()
 {
+    // 30-60 us to process this function
+
     unsigned long currentMillis = millis();   // TODO: check impact on interrupt DCC interrupt timing if we use millis here
 
     // remove packets that have timed out and compact history
