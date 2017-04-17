@@ -9,22 +9,27 @@ unsigned int BitStream::timeZeroMin = 90;
 unsigned int BitStream::timeZeroMax = 10000;   // 110 us for normal bit, 10000 us to allow zero-stretching
 byte BitStream::maxBitErrors = 10;
 
-State BitStream::state = ACQUIRE;
-byte BitStream::lastHalfBit = 0;
-byte BitStream::bitEndsHighOrLow = 0;
-byte BitStream::bitErrorCount = 0;
-byte BitStream::queueSize = 0;
+byte BitStream::interruptPin;
+volatile BitStream::State BitStream::state = SUSPEND;
+volatile boolean BitStream::lastHalfBit = 0;
+volatile boolean BitStream::bitEndsHighOrLow = 0;
+volatile byte BitStream::bitErrorCount = 0;
+volatile byte BitStream::queueSize = 0;
+boolean BitStream::candidateBitEnding;
+byte BitStream::bitEndingMatchCount;
 
-unsigned long BitStream::lastInterruptTime = 0;
-unsigned long BitStream::bitData = 0;
+volatile unsigned long BitStream::lastInterruptTime = 0;
+volatile unsigned long BitStream::bitData = 0;
 
-DataFullHandler BitStream::dataFullHandler;
-ErrorHandler BitStream::errorHandler;
+BitStream::DataFullHandler BitStream::dataFullHandler;
+BitStream::ErrorHandler BitStream::errorHandler;
 
 
-// set up the interrupt handler and initialize the queue.
-BitStream::BitStream(byte interruptPin, boolean withPullup)
+// set up the bitstream capture
+BitStream::BitStream(byte intPin, boolean withPullup)
 {
+    interruptPin = intPin;
+
     // configure pins
     if (withPullup)
     {
@@ -35,25 +40,21 @@ BitStream::BitStream(byte interruptPin, boolean withPullup)
         pinMode(interruptPin, INPUT);
     }
 
-    // set starting time and attach interrupt
-    attachInterrupt(digitalPinToInterrupt(interruptPin), HandleInterrupt, CHANGE);
-    lastInterruptTime = micros();
+    //// TODO: configure timer2 for use in getting interrupt timing
+    //noInterrupts();
+    //TCCR2A = 0;  // zero the regisers initially
+    //TCCR2B = 0;
+    //TIMSK2 = 0;
 
-    // configure timer2 for use in getting interrupt timing
-    noInterrupts();
-    TCCR2A = 0;  // zero the regisers initially
-    TCCR2B = 0;
-    TIMSK2 = 0;
-
-    // configure for 8 prescaler. this gives 0.5 us resolution with a max interval of 127.5 us
-    // for DCC spec timings, the resulting counter limits are  1: 104 to 128, 0: 180 or greater
-    TCCR2B |= (1 << 1);   // configure for 8 prescaler
-    TCNT2 = 0;
-    interrupts();
+    //// configure for 8 prescaler. this gives 0.5 us resolution with a max interval of 127.5 us
+    //// for DCC spec timings, the resulting counter limits are  1: 104 to 128, 0: 180 or greater
+    //TCCR2B |= (1 << 1);   // configure for 8 prescaler
+    //TCNT2 = 0;
+    //interrupts();
 }
 
 
-// set up the bitstream with non-default timings
+// set up the bitstream capture with non-default timings
 BitStream::BitStream(byte interruptPin, boolean withPullup,
     unsigned int OneMin, unsigned int OneMax, unsigned int ZeroMin, unsigned int ZeroMax, byte MaxErrors)
 {
@@ -78,6 +79,41 @@ void BitStream::SetDataFullHandler(DataFullHandler Handler)
 void BitStream::SetErrorHandler(ErrorHandler Handler)
 {
     errorHandler = Handler;
+}
+
+
+// suspend processing of interrupts
+void BitStream::Suspend()
+{
+    noInterrupts();
+    state = SUSPEND;
+    detachInterrupt(digitalPinToInterrupt(interruptPin));
+    interrupts();
+}
+
+
+// begin or resume processing interrupts
+void BitStream::Resume()
+{
+    if (state != SUSPEND) return;   // skip resume if we aren't already suspended
+
+    noInterrupts();
+
+    // reset state and bitstream vars
+    state = ACQUIRE;
+    lastHalfBit = 0;
+    bitEndsHighOrLow = 0;
+    bitErrorCount = 0;
+
+    // initialize the queue
+    queueSize = 0;
+    bitData = 0;
+
+    // set starting time and attach interrupt
+    lastInterruptTime = micros();
+    attachInterrupt(digitalPinToInterrupt(interruptPin), HandleInterrupt, CHANGE);
+
+    interrupts();
 }
 
 
@@ -148,13 +184,42 @@ void BitStream::HandleInterrupt()   // static
             // look for a one halfbit followed by a zero halfbit
             if (lastHalfBit == 1 && isOne == 0)
             {
-                // get current pin state. since we check this after the irq that ends the
-                // zero half bit, this represents the state that the bits will end on
-                bitEndsHighOrLow = HW_IRQ_PORT();
+                // if this is our first acquisition, get the candidate bit ending
+                if (bitEndingMatchCount == 0)
+                {
+                    // get current pin state. since we check this after the irq that ends the
+                    // zero half bit, this represents the state that the bits will end on
+                    candidateBitEnding = (HW_IRQ_PORT()) ? 1 : 0;
 
-                // begin normal processing
-                state = NORMAL;
-                bitErrorCount = 0;
+                    bitEndingMatchCount++;   // not really a match, but start the next steps
+                }
+                else     // subsequent acquisitions
+                {
+                    // if we have no errors and the next bit end matches the candidate bit end
+                    boolean currentPortReading = (HW_IRQ_PORT()) ? 1 : 0;
+                    if (bitErrorCount == 0 && currentPortReading == candidateBitEnding)
+                    {
+                        if (bitEndingMatchCount < bitEndingMinimumMatches)    // still need more matches
+                        {
+                            bitEndingMatchCount++;
+                        }
+                        else      // final matching acquisition
+                        {
+                            // we have validated the candidata bit ending, so assign it
+                            bitEndsHighOrLow = candidateBitEnding;
+                            bitEndingMatchCount = 0;
+
+                            // begin normal processing
+                            state = NORMAL;
+                            bitErrorCount = 0;
+                        }
+                    }
+                    else    // we had an intervening error or a non-match, start over
+                    {
+                        bitEndingMatchCount = 0;
+                        bitErrorCount = 0;
+                    }
+                }
             }
             break;
         }
