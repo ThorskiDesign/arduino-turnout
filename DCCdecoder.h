@@ -156,11 +156,11 @@ private:
     // Order these starting with the expected most common packet types, but note dependencies
     const AccPacketSpec accPacketSpec[5] =
     {
-        { BASICPOM,    (0x80 << 8) + 0xF0, (0x80 << 8) + 0xE0 },
-        { BASIC,       (0x80 << 8) + 0x00, (0x80 << 8) + 0x00 },   // must follow BASICPOM
-        { EXTENDEDPOM, (0x89 << 8) + 0xF0, (0x01 << 8) + 0xE0 },
-        { EXTENDED,    (0x89 << 8) + 0xE0, (0x01 << 8) + 0x00 },   // must follow EXTENDEDPOM
-        { LEGACYPOM,   (0x8C << 8) + 0x00, (0x0C << 8) + 0x00 },
+        { BASICPOM,    (0x80UL << 8) + 0xF0, (0x80UL << 8) + 0xE0 },
+        { BASIC,       (0x80UL << 8) + 0x00, (0x80UL << 8) + 0x00 },   // must follow BASICPOM
+        { EXTENDEDPOM, (0x89UL << 8) + 0xF0, (0x01UL << 8) + 0xE0 },
+        { EXTENDED,    (0x89UL << 8) + 0xE0, (0x01UL << 8) + 0x00 },   // must follow EXTENDEDPOM
+        { LEGACYPOM,   (0x8CUL << 8) + 0x00, (0x0CUL << 8) + 0x00 },
     };
 
     const byte numAccPacketTypes = sizeof(accPacketSpec)/sizeof(AccPacketSpec);

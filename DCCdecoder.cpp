@@ -21,7 +21,7 @@ DCCdecoder::DCCdecoder(byte mfgID, byte mfgVers, byte cv29, boolean allPackets) 
 // Set up or recondifure the decoder
 void DCCdecoder::SetupDecoder(byte mfgID, byte mfgVers, byte cv29, boolean allPackets)  
 {
-    // Save mfg info
+	// Save mfg info
     SetCV(kCV_ManufacturerVersionNo, mfgID);
     SetCV(kCV_ManufacturedID, mfgVers);
 
@@ -167,7 +167,7 @@ void DCCdecoder::SetDecodingErrorHandler(DecodingErrorHandler func)
 // we assume this is a valid, checksummed packet, for example from DCCpacket class
 void DCCdecoder::ProcessPacket(byte *packetData, byte size)
 {
-    // assign params to class vars
+	// assign params to class vars
     packetSize = size;
     for (int i=0; i<packetSize; i++)
         packet[i] = packetData[i];
@@ -332,7 +332,7 @@ void DCCdecoder::ProcessAccBroadcastPacket()
 void DCCdecoder::ProcessAccPacket()
 {
     // combine packet bytes for comparison against packet specs
-    unsigned long comp = (packet[1] << 8) | packet[2];
+    unsigned long comp = ((unsigned long)packet[1] << 8) | packet[2];
 
     // loop through packet specs and check against current packet to identify it
     int i = 0;
