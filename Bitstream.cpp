@@ -1,27 +1,6 @@
 
 #include "Bitstream.h"
 
-//// define/initialize static vars
-//unsigned int BitStream::timeOneMin = DCC_DEFAULT_ONE_MIN * CLOCK_SCALE_FACTOR;
-//unsigned int BitStream::timeOneMax = DCC_DEFAULT_ONE_MAX * CLOCK_SCALE_FACTOR;
-//unsigned int BitStream::timeZeroMin = DCC_DEFAULT_ZERO_MIN * CLOCK_SCALE_FACTOR;
-//unsigned int BitStream::timeZeroMax = DCC_DEFAULT_ZERO_MAX * CLOCK_SCALE_FACTOR;
-//byte BitStream::maxBitErrors = 10;
-//
-//byte BitStream::interruptPin;
-//BitStream::State BitStream::state = SUSPEND;
-//boolean BitStream::lastHalfBit = 0;
-//byte BitStream::bitErrorCount = 0;
-//byte BitStream::queueSize = 0;
-//boolean BitStream::endOfBit = false;
-//
-//unsigned int BitStream::lastInterruptCount = 0;    // 16 bit int for proper overflow with TCNT1
-//unsigned long BitStream::bitData = 0;
-//
-//BitStream::DataFullHandler BitStream::dataFullHandler;
-//BitStream::ErrorHandler BitStream::errorHandler;
-
-
 // define/initialize static vars
 boolean BitStream::lastPinState = 0;
 SimpleQueue BitStream::simpleQueue;
@@ -216,11 +195,18 @@ void BitStream::QueuePut(boolean newBit)
 
 void BitStream::GetIrqTimestamp()    // static
 {
+	// get the timer count before we do anything else
+	unsigned int count = TCNT1;
+
+	// timestamp assignment complete ~3 us after DCC state change
+
+	// check pinstate for change (TODO: why are there spurious IRQs here?
 	boolean pinState = HW_IRQ_PORT();                 // this takes ~0.2 us
 	if (pinState == lastPinState) return;
 	lastPinState = pinState;
 
-	simpleQueue.Put(TCNT1);
+	// add the timestamp to the queue
+	simpleQueue.Put(count);
 
 	// 2.5 microseconds, with pin state check, to add new timestamp to queue
 }
