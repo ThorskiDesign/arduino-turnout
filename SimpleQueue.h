@@ -41,10 +41,11 @@ class SimpleQueue
 {
 	volatile unsigned int values[maxIndex + 1];
 	volatile byte queueSize = 0;
+	volatile byte writeIndex = 0;
 	byte readIndex = 0;
-	byte writeIndex = 0;
 
 public:
+	SimpleQueue();
 	void Put(unsigned int val);
 	unsigned int Get();
 	byte Size();

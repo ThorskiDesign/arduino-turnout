@@ -1,6 +1,14 @@
 
 #include "SimpleQueue.h"
 
+// constructor
+SimpleQueue::SimpleQueue()
+{
+	for (int i = 0; i < maxIndex + 1; i++)
+		values[i] = 0;
+}
+
+
 // add an unsigned int to the queue.
 void SimpleQueue::Put(unsigned int val)
 {
@@ -46,4 +54,7 @@ void SimpleQueue::Reset()
 	queueSize = 0;
 	readIndex = 0;
 	writeIndex = 0;
+
+	for (int i = 0; i < maxIndex + 1; i++)
+		values[i] = 0;
 }
