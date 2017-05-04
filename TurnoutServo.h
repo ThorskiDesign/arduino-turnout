@@ -1,4 +1,3 @@
-// TurnoutServo.h
 
 #ifndef _TURNOUTSERVO_h
 #define _TURNOUTSERVO_h
@@ -41,7 +40,6 @@ private:
 	byte steps[2][30];	                // step sequence going each direction
 	byte currentStep = 0;               // counter to track steps in update loop
 	byte extent[2] = { 90, 90 };        // servo angle at LOW and HIGH positions
-	int movementRange = 0;              // difference between low and high positions, calculated when setting extents
 	int duration[2] = { 2500, 0 };      // duration (ms) of movement at low and high rates (0 = no delay)
     int interval[2] = { 0, 0 };			// time interval between each step
 

@@ -120,9 +120,6 @@ void TurnoutServo::Set(bool Position, bool Rate)
         servoState = STARTING;
         startTime = millis() + servoStartDelay;
         stopTime = millis() + duration[rateSet] + servoStopDelay;
-
-        // get the movement range from the current position to the set position 
-        movementRange = extent[positionSet] - extent[!positionSet];
     }
 }
 
@@ -136,9 +133,24 @@ void TurnoutServo::SetExtent(bool Position, byte Extent)
     // update steps and intervals
     ComputeSteps();
 
-    // adjust the current position of the servo if we're in that position
-    if (Position == HIGH && positionSet == HIGH) Set(HIGH, HIGH);
-    if (Position == LOW && positionSet == LOW) Set(LOW, HIGH);
+	// if we're setting the extent for the current position, adjust the servo position
+	if (Position == positionSet)
+	{
+#ifdef _DEBUG
+		Serial.print("Setting new extent for position ");
+		Serial.println(positionSet, DEC);
+#endif // _DEBUG
+
+		// ensure we are sending pulses for the current position
+		attach(servoPin);
+		write(extent[positionSet]);
+
+		// set state and start/stop times
+		rateSet = HIGH;
+		servoState = STARTING;
+		startTime = millis() + servoStartDelay;
+		stopTime = millis() + duration[rateSet] + servoStopDelay;
+	}
 }
 
 
@@ -177,8 +189,8 @@ void TurnoutServo::ComputeSteps()
 
 
 // Assign the callback function for when servo motion is done
-void TurnoutServo::SetServoMoveDoneHandler(void (*Handler)()) { servoMoveDoneHandler = Handler; }
+void TurnoutServo::SetServoMoveDoneHandler(ServoEventHandler Handler) { servoMoveDoneHandler = Handler; }
 
 
 // Assign the callback function for when the servo power is shut off
-void TurnoutServo::SetServoPowerOffHandler(void (*Handler)()) { servoPowerOffHandler = Handler; }
+void TurnoutServo::SetServoPowerOffHandler(ServoEventHandler Handler) { servoPowerOffHandler = Handler; }
