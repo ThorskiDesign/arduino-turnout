@@ -1,7 +1,6 @@
-// Relay.h
 
-#ifndef _RELAY_h
-#define _RELAY_h
+#ifndef _OUTPUTPIN_h
+#define _OUTPUTPIN_h
 
 #if defined(ARDUINO) && ARDUINO >= 100
 #include "arduino.h"
@@ -9,11 +8,11 @@
 #include "WProgram.h"
 #endif
 
-class RelayClass
+class OutputPin
 {
 public:
-	explicit RelayClass(byte Pin);
-	void SetRelay(bool State);
+	explicit OutputPin(byte Pin);
+	void SetPin(bool State);
 	bool GetState();
 
 private:

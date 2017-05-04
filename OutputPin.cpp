@@ -1,20 +1,20 @@
 
-#include "Relay.h"
+#include "OutputPin.h"
 
-RelayClass::RelayClass(byte Pin)
+OutputPin::OutputPin(byte Pin)
 {
 	pin = Pin;
     state = LOW;
 	pinMode(pin, OUTPUT);
 }
 
-void RelayClass::SetRelay(bool State)
+void OutputPin::SetPin(bool State)
 {
 	state = State;
 	digitalWrite(pin, state);
 }
 
-bool RelayClass::GetState()
+bool OutputPin::GetState()
 {
 	return state;
 }
