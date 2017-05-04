@@ -27,8 +27,8 @@ private:
 	byte pinR;            // the number of the red pin
 	byte pinG;            // the number of the green pin
 	byte pinB;            // the number of the blue pin
-	int onTime = 500;     // milliseconds of on-time
-	int offTime = 500;    // milliseconds of off-time
+	unsigned int onTime = 500;     // milliseconds of on-time
+	unsigned int offTime = 500;    // milliseconds of off-time
 
 	// these maintain the state for a flashing LED
 	bool ledState = LOW;                   // ledState used to set the LED
