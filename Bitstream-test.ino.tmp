@@ -18,9 +18,9 @@ unsigned long errorCount = 0;
 
 void BitStreamHandler(unsigned long incomingBits)
 {
-    noInterrupts();   // disable interrupts here, but shouldn't affect next dcc pulse, since this will be right after one
+    //noInterrupts();   // disable interrupts here, but shouldn't affect next dcc pulse, since this will be right after one
     bits = incomingBits;
-    interrupts();
+    //interrupts();
 
     haveNewBits = true;
 }
@@ -53,6 +53,8 @@ unsigned long lastMillis2 = 0;
 void loop()
     // put your main code here, to run repeatedly:
 {
+	bitStream.ProcessTimestamps();
+
     unsigned long currentMillis = millis();
 
     // test suspend/resume

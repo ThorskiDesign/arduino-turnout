@@ -6,7 +6,6 @@
 
 
 
-
 typedef struct
 {
     int count;
@@ -34,22 +33,13 @@ static unsigned long lastMillis = millis();
 // global stuff
 const byte intPin = 2;
 BitStream bitStream(intPin, false, 48, 68, 88, 10000, 10);
+//BitStream bitStream(intPin, false);
 DCCpacket dccpacket(true,false,100);
-
-boolean haveNewBits = false;
-boolean currentBit = 0;
-volatile unsigned long bits = 0;
-byte numBits = 0;
-int y = 0;
 
 
 void BitStreamHandler(unsigned long incomingBits)
 {
-    noInterrupts();   // disable interrupts here, but shouldn't affect next dcc pulse, since this will be right after one
-    bits = incomingBits;
-    interrupts();
-
-    haveNewBits = true;
+	dccpacket.ProcessIncomingBits(incomingBits);
 }
 
 
@@ -59,7 +49,6 @@ void BitErrorHandler(byte errorCode)
         gBitErrorLog[gBitErrorCount] = errorCode;
     gBitErrorCount++;
 }
-
 
 
 
@@ -236,17 +225,15 @@ void setup()
 
 void loop()
 {
-    unsigned long currentMillis = millis();
+	bitStream.ProcessTimestamps();
 
-    if (haveNewBits)
-    {
-        dccpacket.ProcessIncomingBits(bits);
-        haveNewBits = false;
-    }
+    unsigned long currentMillis = millis();
 
     if (currentMillis - lastMillis > 2000 )
     {
+		bitStream.Suspend();
         DumpAndResetTable();
         lastMillis = millis();
+		bitStream.Resume();
     }
 }

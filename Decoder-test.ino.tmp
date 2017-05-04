@@ -11,38 +11,29 @@
 // global stuff
 const byte intPin = 2;
 BitStream bitStream(intPin, false, 48, 68, 88, 10000, 10);
+//BitStream bitStream(intPin, false);
 DCCpacket dccpacket(true, true, 250);
 DCCdecoder dcc;
-
-boolean haveNewBits = false;
-boolean currentBit = 0;
-volatile unsigned long bits = 0;
-byte numBits = 0;
-int y = 0;
 
 
 // called when the next 32 bits from the bitstream are ready
 void BitStreamHandler(unsigned long incomingBits)
 {
-    noInterrupts();   // disable interrupts here, but shouldn't affect next dcc pulse, since this will be right after one
-    bits = incomingBits;
-    interrupts();
-
-    haveNewBits = true;
+	dccpacket.ProcessIncomingBits(incomingBits);
 }
 
 
 void BitErrorHandler(byte errorCode)
 {
-    Serial.print("Bit error, code: ");
-    Serial.println(errorCode,DEC);
+    //Serial.print("Bit error, code: ");
+    //Serial.println(errorCode,DEC);
 }
 
 
 // called when an assembled packet is ready
 void MainPacketHandler(byte *packetData, byte size)
 {
-    dcc.ProcessPacket(packetData, size);
+	dcc.ProcessPacket(packetData, size);
 }
 
 
@@ -123,7 +114,9 @@ void setup()
     dcc.SetBaselineControlPacketHandler(&DCC_BaselineControlHandler);
     dcc.SetBasicAccessoryPomPacketHandler(&DCC_AccPomHandler);
 
-    pinMode(12, OUTPUT);
+	bitStream.Resume();    // start the bitstream capture
+	
+	pinMode(12, OUTPUT);
 }
 
 
@@ -132,9 +125,5 @@ void setup()
 
 void loop()
 {
-    if (haveNewBits)
-    {
-        dccpacket.ProcessIncomingBits(bits);
-        haveNewBits = false;
-    }
+	bitStream.ProcessTimestamps();
 }
