@@ -8,16 +8,18 @@
 
 // TurnoutMgr constructor
 TurnoutMgr::TurnoutMgr():
-    button(ButtonPin, true),
-    osStraight(OSstraightPin, true),
-    osCurved(OScurvedPin, true),
-    led(LedPinR, LedPinG, LedPinB),
-    servo(ServoPWMPin, ServoPowerPin),
-    relayStraight(RelayStraightPin),
-    relayCurved(RelayCurvedPin),
-    bitStream(DCCPin, false, 48, 68, 88, 10000, 10),    // bitstream capture object, non-standard timings
-    dccPacket(true, true, 250),                         // DCC packet builder
-    dcc()                                               // DCC packet processor
+	button(ButtonPin, true),
+	osStraight(OSstraightPin, true),
+	osCurved(OScurvedPin, true),
+	led(LedPinR, LedPinG, LedPinB),
+	servo(ServoPWMPin, ServoPowerPin),
+	relayStraight(RelayStraightPin),
+	relayCurved(RelayCurvedPin),
+	auxOutput1(Aux1Pin),
+	auxOutput2(Aux2Pin),
+	bitStream(DCCPin, false, 48, 68, 88, 10000, 10),    // bitstream capture object, non-standard timings
+	dccPacket(true, true, 250),                         // DCC packet builder
+	dcc()                                               // DCC packet processor
 {
 }
 
@@ -41,12 +43,8 @@ void TurnoutMgr::Initialize()
 // max number of packet errors and reset bitstream capture if necessary
 void TurnoutMgr::Update()
 {
-    // if we have new data, go process it
-    if (haveNewBits)
-    {
-        dccPacket.ProcessIncomingBits(bits);     // 120-160 us
-        haveNewBits = false;
-    }
+	// process any DCC interrupts that have been timestamped
+	bitStream.ProcessTimestamps();
 
     // do the updates to maintain flashing led and slow servo motion
     unsigned long currentMillis = millis();
@@ -66,17 +64,22 @@ void TurnoutMgr::Update()
     if (currentMillis - lastMillis > 1000)
     {
 #ifdef _DEBUG
-        Serial.print("Bit Error Count:  ");
-        Serial.println(bitErrorCount, DEC);
-        Serial.print("Packet Error Count:  ");
+        Serial.print("Bit Error Count: ");
+        Serial.print(bitErrorCount, DEC);
+        Serial.print("     Packet Error Count: ");
         Serial.println(packetErrorCount, DEC);
 #endif
         // if we see repeated packet errors, reset bitream capture
         if (packetErrorCount > maxPacketErrors)
         {
+			// assume we lost sync on the bitstream, reset the bitstream capture
             bitStream.Suspend();
             bitStream.Resume();
-        }
+
+			// set up timer for LED indication, normal led will resume after this timer expires
+			errorTimer.StartTimer(2000);
+			led.SetLED(RgbLed::YELLOW, RgbLed::FLASH);
+		}
 
         lastMillis = currentMillis;
         bitErrorCount = 0;
@@ -131,8 +134,8 @@ void TurnoutMgr::InitMain()
 
     // configure dcc event handlers
     dcc.SetBasicAccessoryDecoderPacketHandler(WrapperDCCAccPacket);
+    dcc.SetExtendedAccessoryDecoderPacketHandler(WrapperDCCExtPacket);
     dcc.SetBasicAccessoryPomPacketHandler(WrapperDCCAccPomPacket);
-    dcc.SetExtendedAccessoryDecoderPacketHandler(WrapperDCCExtAccPacket);
     dcc.SetDecodingErrorHandler(WrapperDCCDecodingError);
 
     // configure other event handlers
@@ -171,9 +174,9 @@ void TurnoutMgr::FactoryReset()
 
     // normal initilization will resume after this timer expires
     resetTimer.StartTimer(resetDelay);
-    resetTimer.SetTimerHandler(&WrapperResetTimer);
+    resetTimer.SetTimerHandler(WrapperResetTimer);
 
-    led.SetLED(RgbLed::MAGENTA, RgbLed::FLASH);
+    led.SetLED(RgbLed::BLUE, RgbLed::FLASH);
 
     // do the reset
     unsigned int numCVs = sizeof(FactoryDefaultCVs)/sizeof(CVPair);
@@ -197,12 +200,12 @@ void TurnoutMgr::SetRelays()
     // enable the appropriate relay, swapping if needed
     if ((position == STRAIGHT && !relaySwap) || (position == CURVED && relaySwap)) 
     {
-        relayStraight.SetRelay(HIGH);
+        relayStraight.SetPin(HIGH);
     }
 
     if ((position == CURVED && !relaySwap) || ((position == STRAIGHT) && relaySwap))
     {
-        relayCurved.SetRelay(HIGH);
+        relayCurved.SetPin(HIGH);
     }
 }
 
@@ -211,12 +214,12 @@ void TurnoutMgr::SetRelays()
 void TurnoutMgr::SetServo(bool ServoRate)
 {
     // suspend the bitstream capture, since the servo/led related interrupts cause timing errors in the bitstream.
-    // bitstream capture is resumed in the ServoMoveDoneHandler method.
+    // bitstream capture is resumed in the ServoPowerOffHandler method.
     bitStream.Suspend();
 
     // turn off the relays
-    relayStraight.SetRelay(LOW);
-    relayCurved.SetRelay(LOW);
+    relayStraight.SetPin(LOW);
+    relayCurved.SetPin(LOW);
 
     // set the servo
     State servoState = position;
@@ -259,14 +262,16 @@ void TurnoutMgr::ErrorTimerHandler()
 
 
 // do things after the servo is powered off
-void TurnoutMgr::ServoPowerOffHandler() { }
+void TurnoutMgr::ServoPowerOffHandler()
+{
+    bitStream.Resume();   // resume the bitstream capture stopped prior to beginning servo motion
+}
 
 
 // do things after the servo finishes moving to its new position
 void TurnoutMgr::ServoMoveDoneHandler() 
 { 
     SetRelays();          // set the relays for the new position
-    bitStream.Resume();   // resume the bitstream capture stopped prior to beginning servo motion
 }
 
 
@@ -286,11 +291,9 @@ void TurnoutMgr::ButtonEventHandler(bool ButtonState)
         }
         else
         {
-            // button error indication
-            led.SetLED(RgbLed::BLUE, RgbLed::FLASH);
-
-            // normal led will resume after this timer expires
-            errorTimer.StartTimer(2500);
+            // button error indication, normal led will resume after this timer expires
+            errorTimer.StartTimer(1000);
+            led.SetLED(RgbLed::YELLOW, RgbLed::ON);
         }
     }
 }
@@ -326,8 +329,8 @@ void TurnoutMgr::OSCurvedHandler(bool ButtonState)
 }
 
 
-// handle the dcc interpreter callback
-void TurnoutMgr::DCCcommandHandler(unsigned int Addr, unsigned int Direction)
+// handle a DCC basic accessory command, used for changing the state of the turnout
+void TurnoutMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
 {
     // assume we are filtering repeated packets in the packet builder, so we don't check for that here
 
@@ -341,8 +344,8 @@ void TurnoutMgr::DCCcommandHandler(unsigned int Addr, unsigned int Direction)
     if (dccState == position) return;
 
 #ifdef _DEBUG
-    Serial.print("In class callback for dcc command direction ");
-    Serial.println(Direction, DEC);
+    Serial.print("Received dcc command to position ");
+    Serial.println(dccState, DEC);
 #endif
 
     // proceed only if both occupancy sensors are inactive (i.e., sensors override dcc command)
@@ -355,12 +358,53 @@ void TurnoutMgr::DCCcommandHandler(unsigned int Addr, unsigned int Direction)
     }
     else
     {
-        // command error indication
-        led.SetLED(RgbLed::BLUE, RgbLed::FLASH);
-
-        // normal led will resume after this timer expires
-        errorTimer.StartTimer(2500);
+        // command error indication, normal led will resume after this timer expires
+        errorTimer.StartTimer(1000);
+        led.SetLED(RgbLed::YELLOW, RgbLed::FLASH);
     }
+}
+
+
+// handle a DCC extended accessory command, used for controlling the aux outputs
+void TurnoutMgr::DCCExtCommandHandler(unsigned int Addr, unsigned int Data)
+{
+	// assume we are filtering repeated packets in the packet builder, so we don't check for that here
+
+	if (Addr != dccAddress) return;   // exit if this command is not for our address
+
+#ifdef _DEBUG
+	Serial.print("Received dcc signal apsect command, value ");
+	Serial.println(Data, DEC);
+#endif
+
+	// process a matching signal aspect to turn aux outputs on or off
+	if (Data == dcc.GetCV(CV_Aux1Off))
+	{
+		auxOutput1.SetPin(LOW);
+		return;
+	}
+
+	if (Data == dcc.GetCV(CV_Aux1On))
+	{
+		auxOutput1.SetPin(HIGH);
+		return;
+	}
+
+	if (Data == dcc.GetCV(CV_Aux2Off))
+	{
+		auxOutput2.SetPin(LOW);
+		return;
+	}
+
+	if (Data == dcc.GetCV(CV_Aux2On))
+	{
+		auxOutput2.SetPin(HIGH);
+		return;
+	}
+
+	// an invalid signal aspect was received, provide an error indication
+	errorTimer.StartTimer(1000);
+	led.SetLED(RgbLed::YELLOW, RgbLed::ON);
 }
 
 
@@ -378,10 +422,6 @@ void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV
     Serial.println(Value, DEC);
 #endif
 
-    // set up timer for LED indication, normal led will resume after this timer expires
-    errorTimer.StartTimer(2000);
-    errorTimer.SetTimerHandler(&WrapperErrorTimer);
-
     // check against our defined CVs to verify that the CV is valid
     boolean isValidCV = false;
     unsigned int numCVs = sizeof(FactoryDefaultCVs)/sizeof(CVPair);
@@ -390,15 +430,18 @@ void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV
         if (CV == FactoryDefaultCVs[i].CV) isValidCV = true;
     }
 
+    // set up timer for LED indication, normal led will resume after this timer expires
+    errorTimer.StartTimer(1000);
+
     // provide indication and exit if CV is invalid
     if (!isValidCV)
     {
-        led.SetLED(RgbLed::YELLOW, RgbLed::FLASH);
+        led.SetLED(RgbLed::YELLOW, RgbLed::ON);
         return;
     }
 
     // provide feedback that we are programming a valid CV
-    led.SetLED(RgbLed::YELLOW, RgbLed::ON);
+    led.SetLED(RgbLed::BLUE, RgbLed::ON);
 
     // set the cv
     dcc.SetCV(CV, Value);
@@ -410,11 +453,11 @@ void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV
     dccCommandSwap = dcc.GetCV(CV_dccCommandSwap);
     relaySwap = dcc.GetCV(CV_relaySwap);
 
-    // read back and update servo vars from eeprom
-    servo.SetExtent(LOW,dcc.GetCV(CV_servoMinTravel));
-    servo.SetExtent(HIGH,dcc.GetCV(CV_servoMaxTravel));
-    servo.SetDuration(LOW,dcc.GetCV(CV_servoLowSpeed) * 100);
-    servo.SetDuration(HIGH,dcc.GetCV(CV_servoHighSpeed) * 100);
+    // update servo vars from eeprom
+    if (CV == CV_servoMinTravel) servo.SetExtent(LOW,dcc.GetCV(CV_servoMinTravel));
+	if (CV == CV_servoMaxTravel) servo.SetExtent(HIGH,dcc.GetCV(CV_servoMaxTravel));
+	if (CV == CV_servoLowSpeed) servo.SetDuration(LOW,dcc.GetCV(CV_servoLowSpeed) * 100);
+	if (CV == CV_servoHighSpeed) servo.SetDuration(HIGH,dcc.GetCV(CV_servoHighSpeed) * 100);
 }
 
 
@@ -423,20 +466,14 @@ void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV
 
 TurnoutMgr* TurnoutMgr::currentInstance=0;    // pointer to allow us to access member objects from callbacks
 
-// this is called from the ISR for the bitstream capture, so keep it short.
-// we just copy the data and set a flag that it's ready.
+// this is called from the bitstream capture when there are 32 bits to process.
 void TurnoutMgr::WrapperBitStream(unsigned long incomingBits) 
 {
-    noInterrupts();   // disable interrupts here, but shouldn't affect next dcc pulse, since this will be right after one
-    currentInstance->bits = incomingBits;
-    interrupts();
-
-    currentInstance->haveNewBits = true;
+	currentInstance->dccPacket.ProcessIncomingBits(incomingBits);
 }
 
 void TurnoutMgr::WrapperBitStreamError(byte errorCode) 
 {
-    // TODO: add optional LED indication
     currentInstance->bitErrorCount++;
 }
 
@@ -450,7 +487,6 @@ void TurnoutMgr::WrapperDCCPacket(byte *packetData, byte size)
 
 void TurnoutMgr::WrapperDCCPacketError(byte errorCode) 
 {
-    // TODO: add optional LED indication
     currentInstance->packetErrorCount++;
 }
 
@@ -472,16 +508,17 @@ void TurnoutMgr::WrapperOSCurved(bool ButtonState) { currentInstance->OSCurvedHa
 
 void TurnoutMgr::WrapperDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte data)
 {
-    currentInstance->DCCcommandHandler(outputAddress, data);
+    currentInstance->DCCAccCommandHandler(outputAddress, data);
+}
+
+void TurnoutMgr::WrapperDCCExtPacket(int boardAddress, int outputAddress, byte data)
+{
+	currentInstance->DCCExtCommandHandler(outputAddress, data);
 }
 
 void TurnoutMgr::WrapperDCCAccPomPacket(int boardAddress,int outputAddress, byte instructionType, int cv, byte data)
 {
     currentInstance->DCCPomHandler(outputAddress, instructionType, cv, data);
-}
-
-void TurnoutMgr::WrapperDCCExtAccPacket(int boardAddress, int outputAddress, byte data)
-{
 }
 
 void TurnoutMgr::WrapperDCCDecodingError(byte errorCode)
