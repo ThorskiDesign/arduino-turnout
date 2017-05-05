@@ -58,8 +58,8 @@ void DCCpacket::FilterRepeatPackets(boolean Filter)
 // process an incoming sequence of 32 bits, stored in an unsigned long
 void DCCpacket::ProcessIncomingBits(unsigned long incomingBits)
 {
-    // we get a new set of bits from the DCC bitstream about every 5ms.
-    // takes approx 120-140 us to process a set of bits, excluding callbacks and repeat filtering,
+    // We get a new set of bits from the DCC bitstream about every 5ms.
+    // It takes approx 120-140 us to process a set of bits, excluding callbacks and repeat filtering,
     // or 150-250 us with repeat filtering enabled.
 
     dataBits = incomingBits;

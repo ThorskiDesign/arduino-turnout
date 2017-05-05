@@ -1,4 +1,48 @@
-// DCCpacket.h
+
+/*
+
+DCC Packet Builder
+
+A class to build and validate DCC packets from a bitstream.
+
+Summary:
+
+Building the DCC packets is initiated by calling the ProcessIncomingBits method, passing it a 
+long int containing 32 bits from the bitstream. The bits are processed in turn, starting with
+searching for the preamble, and then progressing to building the packets. After a complete 
+packet is built, the Execute method is called, which performs a checksum, checks for repeat
+packets, and finally performs a callback with the completed packet. Callbacks provide error
+handling in the case of incorrect packet lengths or failed checksums.
+
+Example Usage:
+
+	DCCpacket;                              // DCCpacket object, default settings
+	DCCpacket dccpacket(true,false,100);    // with checksum, repeat packet filtering, and repeat interval
+
+Details:
+
+In the READPREAMBLE state, the incoming bitstream is searched for a series of consecutive 1 bits.
+After finding the preamble, the state changes to READPACKET. In this state, eight bits are read,
+followed by checking the next bit to determine if the packet has ended. When a 1 bit is read here,
+indicating the end of the packet, control passes to the Execute method.
+
+The Execute method performs two optional checks on the packet. A checksum is performed per the
+DCC spec using the last data byte. If the checksum passes, the packet is then checked to determine
+if it has been repeated within a given time interval. If the packet passes both of these checks,
+a callback is performed with the completed packet. After a packet is built and executed, the Reset
+method resets the packet data and the state reverts to READPREAMBLE.
+
+The IsRepeatPacket method checks for repeat packets within a certain time interval, returning true 
+if a match is found. A log is maintained of recent packets. The log is updated on entry to the
+method to remove packets that are outside the specified time interval. Packets that are still within
+the time interval are moved toward the start of the log. This process not only removes old packets,
+but also ensures that commonly received packets (e.g., idle packets) are at the front of the list.
+The current packet is then checked against the list. If a match is found, the timestamp on the log
+entry is updated, and the method returns true. If the packet is not found in the list, the packet
+and its timestamp are added to the log, and the method returns false.
+
+*/
+
 
 #ifndef _DCCPACKET_h
 #define _DCCPACKET_h
