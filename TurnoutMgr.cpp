@@ -17,7 +17,8 @@ TurnoutMgr::TurnoutMgr():
 	relayCurved(RelayCurvedPin),
 	auxOutput1(Aux1Pin),
 	auxOutput2(Aux2Pin),
-	bitStream(DCCPin, false, 48, 68, 88, 10000, 10),    // bitstream capture object, non-standard timings
+	//bitStream(DCCPin, false, 48, 68, 88, 10000, 10),    // bitstream capture object, non-standard timings
+	bitStream(DCCPin, false),                            // bitstream capture object
 	dccPacket(true, true, 250),                         // DCC packet builder
 	dcc()                                               // DCC packet processor
 {

@@ -213,7 +213,7 @@ boolean DCCpacket::IsRepeatPacket()
 {
     // 30-60 us to process this function
 
-    unsigned long currentMillis = millis();   // TODO: check impact on interrupt DCC interrupt timing if we use millis here
+    unsigned long currentMillis = millis();
 
     // remove packets that have timed out and compact history
     byte newEntryCount = 0;
