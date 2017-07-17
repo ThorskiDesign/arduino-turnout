@@ -1,4 +1,50 @@
-// DCCdecoder.h
+
+/*
+
+DCC Decoder
+
+A class to decode DCC packets, as defined here:
+https://www.nmra.org/sites/default/files/s-92-2004-07.pdf
+https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
+
+Summary:
+
+This class decodes a DCC packet as described in the NMRA specs above. It determines the packet type,
+then processes it to extract the address and specific packet data. Callbacks are provided for each of
+the main packet types. CV support is provided via the EEPROM library, allowing for setting a decoder
+address and for configuration changes.
+
+Example Usage:
+
+	dcc.SetupDecoder(0, 0, cv29, false);
+	dcc.ProcessPacket(packetData, size);
+
+Details:
+
+Packet decoding begins when the ProcessPacket is called with packet data. The packet is inspected to 
+determine its type, after which specific methods are called to decode it accordingly. Each method
+gets the DCC address, packet data, and any other information from the packet, and then performs a
+callback to pass the decoded data back to the calling library. Packets to addresses other than the
+configured address are ignored by default. Broadcast packets are returned with a value of 0 in the
+address field. Packet data is assumed to be a valid, checksummed packet, for example from the 
+DCCpacket class.
+
+Idle, locomotive (short and long), accessory, broadcast (loco and accessory) packet types are supported.
+The basic packet type is determined by masking bits of the packet and conparing to the expected 
+patterns as defined in the NMRA spec. Packet specs are ordered beginning with the most common, except
+where the expected bit patterns require a certain sequence. Decoding of the packet data is handled 
+specifically for each packet type. Accessory packet types are further categorized in a similar manner. 
+Basic and extended packets are supported, as are basic program on main, extended program on main, and 
+legacy program on main.
+
+Reading and writing of CVs to non-volatile storage is provided via the EEPROM library. A decoder
+address may be configured and stored so that only relevant packets are returned in the callbacks.
+
+TODO: The library currently only implements the most basic locomotive functionality.
+
+*/
+
+
 
 #ifndef _DCCDECODER_h
 #define _DCCDECODER_h
@@ -10,7 +56,7 @@
 #endif
 
 
-// (from DCC_Decoder.h)
+// (from MynaBay DCC_Decoder.h)
 // Multifunction Decoders
 #define kDCC_STOP_SPEED            0xFE
 #define kDCC_ESTOP_SPEED           0xFF

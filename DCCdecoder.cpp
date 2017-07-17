@@ -18,7 +18,7 @@ DCCdecoder::DCCdecoder(byte mfgID, byte mfgVers, byte cv29, boolean allPackets) 
 }
 
 
-// Set up or recondifure the decoder
+// Set up or reconfigure the decoder
 void DCCdecoder::SetupDecoder(byte mfgID, byte mfgVers, byte cv29, boolean allPackets)  
 {
 	// Save mfg info
