@@ -99,12 +99,12 @@ public:
 
 private:
     // Hardware assignments
-	const byte DCCPin = 8;
+	const byte DCCPin = 2;
 	const byte ButtonPin = 3;
 	const byte ServoPowerPin = 4;
 	const byte ServoPWMPin = 5;
 	const byte LedPinR = 7;
-	const byte LedPinG = 12;
+	const byte LedPinG = 8;
 	const byte LedPinB = 6;
 	const byte RelayStraightPin = 14;
 	const byte RelayCurvedPin = 15;

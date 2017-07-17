@@ -14,11 +14,7 @@ TurnoutServo::TurnoutServo(byte ServoPin, byte PowerPin)
 void TurnoutServo::Initialize(byte ExtentLow, byte ExtentHigh, bool Position)
 {
     pinMode(powerPin, OUTPUT);
-	pinMode(servoPin, OUTPUT);
-	digitalWrite(powerPin, LOW);
-	digitalWrite(servoPin, LOW);
-
-	extent[LOW] = ExtentLow;
+    extent[LOW] = ExtentLow;
     extent[HIGH] = ExtentHigh;
     positionSet = Position;
 
@@ -31,11 +27,7 @@ void TurnoutServo::Initialize(byte ExtentLow, byte ExtentHigh, bool Position)
 void TurnoutServo::Initialize(byte ExtentLow, byte ExtentHigh, int DurationLow, int DurationHigh, bool Position)
 {
     pinMode(powerPin, OUTPUT);
-	pinMode(servoPin, OUTPUT);
-	digitalWrite(powerPin, LOW);
-	digitalWrite(servoPin, LOW);
-	
-	extent[LOW] = ExtentLow;
+    extent[LOW] = ExtentLow;
     extent[HIGH] = ExtentHigh;
     duration[LOW] = DurationLow;
     duration[HIGH] = DurationHigh;
@@ -91,7 +83,6 @@ void TurnoutServo::Update(unsigned long CurrentMillis)
         servoState = OFF;                    // reset to OFF state
         digitalWrite(powerPin, LOW);         // disable the servo power
         detach();                            // stop sending pwm pulses
-		digitalWrite(servoPin, LOW);         // force servo pin low
 
         // raise the event indicating the servo has been powered off
         if (servoPowerOffHandler) servoPowerOffHandler();
