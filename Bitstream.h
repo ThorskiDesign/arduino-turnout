@@ -8,12 +8,12 @@ http://www.nmra.org/sites/default/files/standards/sandrp/pdf/s-9.1_electrical_st
 
 Summary:
 
-A hardware interrupt is configured on CHANGE, so each time the signal transitions, the ISR is called.
-In the ISR, the time of the interrupt in Timer1 counts is stored in a queue as an unsigned int.
+An input capture register is configured so that each time the signal transitions, the ISR is called. 
+In the ISR, the time of the interrupt in Timer1 counts is stored in a queue as an unsigned int. 
 When the timestamps are retrieved from the queue, the time between the current timestamp and the 
 previous timestamp is used to determine whether the current half of the bit indicates a 0 or a 1. 
-After a valid bit is found, it is added to an output queue. When the output queue is full, a 
-callback is performed to provide the data.
+After a valid bit is found, it is added to an output queue. When the output queue is full, a callback 
+is performed to provide the data.
 
 Example usage:
 
@@ -26,30 +26,30 @@ Example usage:
 
 Details:
 
-In the NORMAL mode, the ISR is attached and captures timestamps of the DCC events in a queue.
-The timestamp queue is examined for a matching pair of half bits that makes up a full bit. When 
-a complete bit is found, it is added to the output queue. Error checking is performed on each half 
-bit. If a half bit does not fall within the valid ranges for a 0 or 1, a callback is triggered 
-and a counter incremented. After a configurable number of consecutive bit errors, another callback 
-is triggered and the timestamp queue is reset. The bit error count is reset after each complete bit.
+In the NORMAL mode, the ISR is called on each transition of the DCC signal and captures timestamps 
+of the DCC events in a queue. The edge select bit of the capture register is toggled each time in 
+the ISR, so that both rising and falling edges are captured. The timestamp queue is examined for a 
+matching pair of half bits that makes up a full bit. When a complete bit is found, it is added to the
+output queue. Error checking is performed on each half bit. If a half bit does not fall within the 
+valid ranges for a 0 or 1, a callback is triggered and a counter incremented. After a configurable 
+number of consecutive bit errors, another callback is triggered and the timestamp queue is reset. 
+The bit error count is reset after each complete bit. The timestamp queue, period calculations, etc. 
+are done using unsigned int so that the Timer1 overflow is handled transparently.
 
 Suspend/Resume methods allow starting, stopping, or resetting the bitstream capture, depending
 on outside factors (for example, during times when the signal may be degraded, or when other higher
-priority processing needs to take place). The hardware interrupt is detached when suspended, and
-attached when resumed. Timer1 is configured in the Resume method, so that it can be used for other
+priority processing needs to take place). The input capture interrupt is disabled when suspended, and
+enabled when resumed. Timer1 is configured in the Resume method, so that it can be used for other
 purposes (e.g. servo) when the bitstream capture is suspended.
 
 The output queue is an unsigned long, into which 32 bits are stored as they are received. The queue is
 shifted left each time a bit is added, so the bits are stored left to right in the order in which 
 the are received. After 32 bits have been stored, a callback is triggered, and the queue is reset.
 
-Notes on hardware timing: The ISR in NORMAL mode takes 2.5 microseconds to run, so any pulses faster
-than that will get lost or have questionable timestamps. Additionally, other interrupts may affect 
-the timing of this interrupt. The 0/1 timing limits default to the DCC spec, however wider limits 
-may result in reduced bit errors if other interrupts are occuring. Timer1 is configured with a prescaler
-of 8, which gives 0.5 microsend resolution, with an overflow every ~32 milliseconds. The timestamp 
-queue, period calculations, etc. are done using unsigned int so that the overflow is handled
-transparently.
+Notes on hardware interrupt timing: The hardware interrupt ISR in NORMAL mode takes 2.5 microseconds
+to run, so any pulses faster than that will get lost or have questionable timestamps. Additionally, 
+other interrupts may affect the timing of this interrupt. The timing based on the input capture register 
+(used by default) is not subject to these effects. 
 
 */
 
@@ -81,8 +81,10 @@ transparently.
 #define DCC_DEFAULT_ZERO_MIN			90
 #define DCC_DEFAULT_ZERO_MAX			10000    // 110 us for normal bit, 10000 us to allow zero-stretching
 
-#define CLOCK_SCALE_FACTOR				2        // number of clock ticks per microsecond
-                                                 // 8 prescaler gives a 0.5 us interval
+//#define CLOCK_SCALE_FACTOR				2U       // number of clock ticks per microsecond
+//                                                 // 8 prescaler gives a 0.5 us interval
+#define CLOCK_SCALE_FACTOR				16U      // number of clock ticks per microsecond
+												 // no prescaler gives a 0.0625 us interval
 
 
 class BitStream
@@ -108,6 +110,8 @@ public:
 
 	// process the raw timestamp queue
 	void ProcessTimestamps();
+
+	static SimpleQueue simpleQueue;         // queue for the DCC timestamps
 
 private:
     // states
@@ -136,7 +140,6 @@ private:
     byte bitErrorCount = 0;                 // current number of sequential bit errors
     byte maxBitErrors = 10;                 // max number of bit errors before we revert to acquire state
 	static boolean lastPinState;            // last state of the IRQ pin
-	static SimpleQueue simpleQueue;         // queue for the DCC timestamps
 
     // Output queue structure
     const byte maxBitIndex = 31;            // 32 bits total to store in unsigned long

@@ -54,7 +54,8 @@ void BitStream::Suspend()
 {
 	noInterrupts();
 	state = SUSPEND;
-	detachInterrupt(digitalPinToInterrupt(interruptPin));
+	detachInterrupt(digitalPinToInterrupt(interruptPin));   // disable the h/w interrupt
+	TIMSK1 = 0;                                             // disable input capture interrupt
 	interrupts();
 }
 
@@ -66,14 +67,18 @@ void BitStream::Resume()
 
 	noInterrupts();
 
-	// Configure timer1 for use in getting interrupt timing, just need a looping counter.
-	// Set up with 8 prescaler. this gives 0.5 us resolution with an overflow every 32.7ms.
+	// Configure timer1 for use in getting interrupt timing.
 	TCCR1A = 0;    // reset the registers initially
 	TCCR1B = 0;
 	TCCR1C = 0;
 	TCNT1 = 0;
 	TIMSK1 = 0;
-	TCCR1B |= (1 << 1);   // set CS11 bit for 8 prescaler
+	//TCCR1B |= (1 << 1);   // set CS11 bit for 8 prescaler (0.5 us resolution, overflow every 32 ms)
+	TCCR1B |= (1 << 0);   // set CS10 bit for no prescaler (0.0625 us resolution, overflow every 4 ms)
+
+	// input capture register configuration
+	TCCR1B |= (1 << 6);  // set input capture edge select bit for rising
+	TCCR1B |= (1 << 7);  // set input capture noise canceler
 
 	// reset state and bitstream vars
 	state = NORMAL;
@@ -86,9 +91,10 @@ void BitStream::Resume()
 	queueSize = 0;
 	bitData = 0;
 
-	// set starting time and attach interrupt
+	// set starting time and configure interrupt
 	lastInterruptCount = TCNT1;
-	attachInterrupt(digitalPinToInterrupt(interruptPin), GetIrqTimestamp, CHANGE);
+	//attachInterrupt(digitalPinToInterrupt(interruptPin), GetIrqTimestamp, CHANGE);
+	TIMSK1 |= (1 << 5);  // enable input capture interrupt
 
 	interrupts();
 }
@@ -97,6 +103,7 @@ void BitStream::Resume()
 // process the queued DCC timestamps to see if they represent a one or a zero.
 void BitStream::ProcessTimestamps()
 {
+	// generate debugging pulses on scope to monitor simpleQueue size.
 	//if (simpleQueue.Size()>0) HW_DEBUG_PULSE();
 	//if (simpleQueue.Size()>1) HW_DEBUG_PULSE();
 	//if (simpleQueue.Size()>2) HW_DEBUG_PULSE();
@@ -209,4 +216,14 @@ void BitStream::GetIrqTimestamp()    // static
 	simpleQueue.Put(count);
 
 	// 2.5 microseconds, with pin state check, to add new timestamp to queue
+}
+
+
+ISR(TIMER1_CAPT_vect)        // static, global
+{
+	unsigned int capture = ICR1;    // store the capture register before we do anything else
+	TCCR1B ^= 0x40;                 // toggle the edge select bit,  (1<<6) = 0x40
+	TIFR1 |= 0x20;                  // clear the input capture flag by writing a one to it,  (1<<5) = 0x20
+
+	BitStream::simpleQueue.Put(capture);      // add the value in the input capture register to the queue
 }
