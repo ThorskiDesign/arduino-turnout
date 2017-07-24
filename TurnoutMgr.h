@@ -27,17 +27,15 @@ Example Usage:
 Details:
 
 DCC command processing takes place as follows. The raw bitstream is captured by the BitStream
-object. When 32 bits have been captured, a flag is set. The Update method checks that flag, and
-sends data to the DCCpacket object when available. After the DCCpacket object has assembled and
-checksummed a complete packet, a callback to the DCCdecoder initiates processing of the packet.
-Callbacks from the DCCdecoder to the TurnoutMgr trigger actions for normal accessory decoder 
-packets, extended accessory decoder packets, and programming on main packets.
+object. When 32 bits have been captured, a callback to the packet decoder begins the assembly
+of the DCC packet. After the packet decoder has assembled and checksummed a complete packet, a 
+callback to the DCCdecoder initiates processing of the packet. Callbacks from the DCCdecoder 
+to the TurnoutMgr trigger actions for normal accessory decoder packets, extended accessory 
+decoder packets, and programming on main packets.
 
 The constructor initializer list configures the objects for managing the button, LED, servo, and
-various sensors and actuators. It also configures the BitStream and DCCpacket objects. The BitStream
-is configured with wider timings than the DCC spec, to improve reliability while other interrupts
-are processing. The DCCpacket object is configured with checksum and filtering of repeat packets 
-enabled.
+various sensors and actuators. It also configures the BitStream and DCCpacket objects. The DCCpacket 
+object is configured with checksum and filtering of repeat packets enabled.
 
 The InitMain method performs the major setup for the class, including setting up the DCC packet
 processor, reading the stored configuration from EEPROM (via the DCCdecoder lib), getting the stored
@@ -47,8 +45,8 @@ is triggered in the Initialize method, the CVs are restored to their default set
 is set which then runs the InitMain method. The Initialize method should be called once from the
 main arduino setup() function.
 
-The Update method should be called in the main arduino loop() method. This method checks for queued
-bits from the BitStream object, and if ready, sends them to the DCCpacket object to be assembled
+The Update method should be called in the main arduino loop() method. This method processes timestamps
+received by the BitStream object, which then sends them to the DCCpacket object to be assembled
 into a full DCC packet. It also handles millis-related updates for the LED, sensors, timers and
 servo. Packet error count per second is also checked. If it exceeds a configurable max value, a
 reset of the bitstream object takes place.
