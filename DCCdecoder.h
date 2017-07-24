@@ -16,8 +16,9 @@ address and for configuration changes.
 
 Example Usage:
 
-	dcc.SetupDecoder(0, 0, cv29, false);
-	dcc.ProcessPacket(packetData, size);
+	DCCdecoder dcc();                        // create an instance of the DCCdecoder
+	dcc.SetupDecoder(0, 0, cv29, false);     // configure the dcc decoder
+	dcc.ProcessPacket(packetData, size);     // send packet data to be decoded
 
 Details:
 

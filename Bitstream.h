@@ -17,9 +17,8 @@ is performed to provide the data.
 
 Example usage:
 
-    BitStream bitStream;
-    bitStream(DCCPin, false);                           // bitstream capture object, default timings
-    bitStream(DCCPin, false, 48, 68, 88, 10000, 10);    // bitstream capture object, non-standard timings
+    BitStream bitStream(DCCPin, false);                           // bitstream capture object, default timings
+    BitStream bitStream(DCCPin, false, 48, 68, 88, 10000, 10);    // bitstream capture object, non-standard timings
     bitStream.Resume();                                 // start the bitstream capture
 	bitStream.Suspend();                                // stop the bitstream capture
 	bitStream.ProcessTimeStamps();					    // process any DCC timestamps in the queue
