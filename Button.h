@@ -1,4 +1,26 @@
-// button.h
+
+/*
+
+Button
+
+A class providing a debounced button input.
+
+Summary:
+
+Creates a debounced button object on a pin and sets the use of the internal pullup resistor. The update
+method checks for changes in the pin state. If a change is detected, a start time is set. After the
+debounce interval has elapsed without further state changes, the button press handler is called to 
+report the current state. The debounced button state may also be accessed directly using the
+SwitchState method.
+
+Example usage:
+
+	Button button(ButtonPin, true);            // create a button object on a given pin, with pullup enabled
+	button.Update(currentMillis);              // update state of the debounce logic
+	button.SetButtonPressHandler(handler);     // set the handler for the button press
+
+*/
+
 
 #ifndef _BUTTON_h
 #define _BUTTON_h

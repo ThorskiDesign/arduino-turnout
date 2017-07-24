@@ -1,4 +1,17 @@
-// EventTimer.h
+/*
+
+Event Timer
+
+A simple timer class to trigger a callback after a specified duration.
+
+Example usage:
+
+		EventTimer timer;                 // create an instance of an event timer.
+		timer.StartTimer(250);            // start the timer with the spcified duration.
+		timer.SetTimerHandler(handler);   // set the handler to call when the duration has elapsed.
+
+*/
+
 
 #ifndef _EVENTTIMER_h
 #define _EVENTTIMER_h
