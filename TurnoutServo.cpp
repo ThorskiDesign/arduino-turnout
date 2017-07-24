@@ -128,7 +128,7 @@ void TurnoutServo::Set(bool Position, bool Rate)
         // set state and start/stop times
         servoState = STARTING;
         startTime = millis() + servoStartDelay;
-        stopTime = millis() + duration[rateSet] + servoStopDelay;
+        stopTime = startTime + duration[rateSet] + servoStopDelay;
     }
 }
 
