@@ -158,7 +158,7 @@ void TurnoutServo::SetExtent(bool Position, byte Extent)
 		rateSet = HIGH;
 		servoState = STARTING;
 		startTime = millis() + servoStartDelay;
-		stopTime = millis() + duration[rateSet] + servoStopDelay;
+		stopTime = startTime + duration[rateSet] + servoStopDelay;
 	}
 }
 

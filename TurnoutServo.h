@@ -1,4 +1,52 @@
 
+/*
+
+Turnout Servo
+
+A class to manage a servo for a turnout.
+
+Summary:
+
+This class manages a servo used for driving the points of a turnout. It provides functionality 
+to toggle the servo between each of two endpoints at either a high or low rate of speed. It handles 
+control of the power circuit as well as the servo signal itself. 
+
+Example usage:
+
+		TurnoutServo servo(ServoPWMPin, ServoPowerPin);      // create an instance of the turnout servo using
+		                                                     // specified pins for the pwm and power signals.
+		servo.Initialize(ExtentLow, ExtentHigh, Position);   // initialize the servo endpoints and current
+		                                                     // position.
+		servo.Set(Position, Rate);               // set the servo to a position at the given rate.
+		servo.Update();                          // check and update the servo state and position.
+
+Details:
+
+The TurnoutServo object is created with values specifying the pins used for the PWM signal as well 
+as the signal controlling the servo power switch. The servo is further initialized with the high and 
+low extents representing the desired limits of motion. Fast and slow rates of travel may optionally 
+be specified.
+
+When the Set method is called, the desired position and rate are set, the servo state is set to 
+STARTING, the PWM signal is started, and the start and end times are calculated. The Update method 
+checks the current millis() against the start and end times. When the start time is hit, the servo
+power pin is turned on, and the state is set to MOVING. While MOVING, when an interval has elapsed,
+the servo is commanded to the next step. After the final step, the move done handler is called, and
+the state is set to STOPPING. After the stop time has elapsed, the servo power pin is turned off 
+and the power off handler is called.
+
+The movement steps of the servo are computed when the extents and/or duration are altered, to 
+avoid repeatedly doing so when moving the servo. The positions corresponding to a given step of
+the motion are based on the extents and the number of steps. The time interval between each step
+is based on the high or low rate duration and the number of steps.
+
+The power pin controls a high-side power switch, allowing the servo power to be disabled when it 
+is not in use. Power is enabled shortly prior to beginning the servo motion, and is disabled after
+the servo motion is completed. A callback is called when the servo power is turned off.
+
+*/
+
+
 #ifndef _TURNOUTSERVO_h
 #define _TURNOUTSERVO_h
 
