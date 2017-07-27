@@ -1,4 +1,33 @@
-// RGB_LED.h
+
+/*
+
+RGB LED
+
+A class for managing an RGB LED.
+
+Summary:
+
+This class provides an object for managing an RGB LED, with seven pre-defined colors and a flash
+mode.
+
+Example usage:
+
+	RgbLed led(LedPinR, LedPinG, LedPinB);       // create the led object using the specified output pins.
+	led.SetLED(RgbLed::BLUE, RgbLed::FLASH);     // set the led to flashing blue.
+	led.Update();                                // update the state of the led based on the current time.
+
+Details:
+
+An led object is created using the specified three output pins for the red, green, and blue elements
+of the led. One of seven colors can be specified using the ColorType enum. The led mode (on, off, or
+flash) can be set using the ModeType enum. If the led is set on or off, the constituent elements are
+simply turned on or off. If the led is set to flash, the elements are turned on and off when the 
+on/off intervals have elapsed. The Update() method must be called regularly to manage the timing for
+the flashing.
+
+*/
+
+
 
 #ifndef _RGB_LED_h
 #define _RGB_LED_h
