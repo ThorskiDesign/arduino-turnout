@@ -114,21 +114,10 @@ bool TurnoutServo::IsActive() { return (servoState != OFF); }
 // Sets the servo to a position at the specified rate
 void TurnoutServo::Set(bool Position, bool Rate)
 {
-    // if we aren't on already, and position is new
-    if (servoState == OFF && Position != positionSet)
+    // if position is new, start servo motion
+    if (Position != positionSet)
     {
-        // ensure we are sending pulses for the current position
-        attach(servoPin);
-        write(extent[positionSet]);
-
-        // update position and rate settings
-        positionSet = Position;
-        rateSet = Rate;
-
-        // set state and start/stop times
-        servoState = STARTING;
-        startTime = millis() + servoStartDelay;
-        stopTime = startTime + duration[rateSet] + servoStopDelay;
+		StartUp(Position, Rate);
     }
 }
 
@@ -150,16 +139,32 @@ void TurnoutServo::SetExtent(bool Position, byte Extent)
 		Serial.println(positionSet, DEC);
 #endif // _DEBUG
 
-		// ensure we are sending pulses for the current position
-		attach(servoPin);
-		write(extent[positionSet]);
-
-		// set state and start/stop times
-		rateSet = HIGH;
-		servoState = STARTING;
-		startTime = millis() + servoStartDelay;
-		stopTime = startTime + duration[rateSet] + servoStopDelay;
+		StartUp(Position, HIGH);
 	}
+}
+
+
+// configure and start up servo motion
+void TurnoutServo::StartUp(bool Position, bool Rate)
+{
+	// exit if already processing a set command
+	if (servoState != OFF) return;
+
+	// callback for startup event
+	if (servoStartupHandler) servoStartupHandler();
+
+	// ensure we are sending pulses for the current position
+	attach(servoPin);
+	write(extent[positionSet]);
+
+	// update position and rate settings
+	positionSet = Position;
+	rateSet = Rate;
+	
+	// set state and start/stop times
+	servoState = STARTING;
+	startTime = millis() + servoStartDelay;
+	stopTime = startTime + duration[rateSet] + servoStopDelay;
 }
 
 
@@ -195,6 +200,10 @@ void TurnoutServo::ComputeSteps()
     interval[0]=duration[0]/numSteps;     // low rate interval
     interval[1]=duration[1]/numSteps;     // high rate interval
 }
+
+
+// Assign the callback function for when the servo is congfigured to being moving
+void TurnoutServo::SetServoStartupHandler(ServoEventHandler Handler) { servoStartupHandler = Handler; }
 
 
 // Assign the callback function for when servo motion is done

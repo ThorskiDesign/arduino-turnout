@@ -72,7 +72,9 @@ class TurnoutServo : public Servo
 	bool IsActive();
 	void Set(bool Position, bool Rate);
 	void SetExtent(bool Position, byte Extent);
+	void StartUp(bool Position, bool Rate);
 	void SetDuration(bool Position, int Duration);
+	void SetServoStartupHandler(ServoEventHandler Handler);
 	void SetServoMoveDoneHandler(ServoEventHandler Handler);
 	void SetServoPowerOffHandler(ServoEventHandler Handler);
 
@@ -100,6 +102,7 @@ private:
 	const int servoStopDelay = 500;     // time the servo remains active after the duration to ensure motion is complete
 	unsigned long lastUpdate = 0;       // time of the last servo write
 
+	ServoEventHandler servoStartupHandler = 0;      // pointer to handler for when the servo is configured to start moving
 	ServoEventHandler servoMoveDoneHandler = 0;     // pointer to handler for when servo motion is complete
 	ServoEventHandler servoPowerOffHandler = 0;     // pointer to handler for when servo power is shut off
 };
