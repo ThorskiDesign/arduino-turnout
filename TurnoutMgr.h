@@ -113,7 +113,7 @@ private:
 
     // main functions
 	void InitMain();
-	void FactoryReset();
+	void FactoryReset(bool HardReset);
 	void SetServo(bool ServoRate);
 	void SetRelays();
 
@@ -150,6 +150,7 @@ private:
 	bool dccCommandSwap = false;               // optionally swap the meaning of received dcc commands
 	bool relaySwap = false;					   // optionally swap the straight/curved relays
 	bool factoryReset = false;                 // is a reset in progress
+	bool showErrorIndication = true;           // enable or disable LED error indications
 
 	// define our available cv's  (allowable range 33-81 per 9.2.2)
 	const byte CV_servoMinTravel = 33;
@@ -171,26 +172,28 @@ private:
 	{
 		uint16_t  CV;
 		uint8_t   Value;
+		bool      SoftReset;
 	};
 
 	// factory default settings
+	const byte softResetSignalAspect = 31;     //  signal aspect value for soft reset
 	CVPair FactoryDefaultCVs [15] =
 	{
-		{kCV_AddressLSB, 1},    // defined in DCCdecoder.h, default to address = 1
-		{kCV_AddressMSB, 0},    // defined in DCCdecoder.h
-		{CV_servoMinTravel, 90},
-		{CV_servoMaxTravel, 90},
-		{CV_servoLowSpeed, 25},
-		{CV_servoHighSpeed, 0},
-		{CV_servoEndPointSwap, 0},
-		{CV_occupancySensorSwap, 0},
-		{CV_dccCommandSwap, 0},
-		{CV_relaySwap, 0},
-		{CV_Aux1Off, 10},
-		{CV_Aux1On, 11},
-		{CV_Aux2Off, 20},
-		{CV_Aux2On, 21},
-		{CV_turnoutPosition, 0}
+		{kCV_AddressLSB, 1, false},    // defined in DCCdecoder.h, default to address = 1
+		{kCV_AddressMSB, 0, false},    // defined in DCCdecoder.h
+		{CV_servoMinTravel, 90, false},
+		{CV_servoMaxTravel, 90, false},
+		{CV_servoLowSpeed, 25, true},
+		{CV_servoHighSpeed, 0, true},
+		{CV_servoEndPointSwap, 0, true},
+		{CV_occupancySensorSwap, 0, true},
+		{CV_dccCommandSwap, 0, true},
+		{CV_relaySwap, 0, true},
+		{CV_Aux1Off, 10, true },
+		{CV_Aux1On, 11, true },
+		{CV_Aux2Off, 20, true },
+		{CV_Aux2On, 21, true },
+		{CV_turnoutPosition, 0, false}
 	};
 
 	// event handlers
@@ -198,6 +201,7 @@ private:
 	void DCCExtCommandHandler(unsigned int Addr, unsigned int Data);
 	void DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value);
 	void ButtonEventHandler(bool ButtonState);
+	void ServoStartupHandler();
 	void ServoMoveDoneHandler();
 	void ServoPowerOffHandler();
 	void ResetTimerHandler();
@@ -216,7 +220,8 @@ private:
     
     // Turnout manager event handler wrappers
     static void WrapperButtonPress(bool ButtonState);
-    static void WrapperServoMoveDon();
+	static void WrapperServoStartup();
+    static void WrapperServoMoveDone();
     static void WrapperServoPowerOff();
     static void WrapperResetTimer();
     static void WrapperErrorTimer();

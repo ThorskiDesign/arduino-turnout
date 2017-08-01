@@ -22,6 +22,31 @@ TurnoutMgr::TurnoutMgr():
 	dccPacket(true, true, 250),                         // DCC packet builder
 	dcc()                                               // DCC packet processor
 {
+	// set pointer to this instance of the turnout manager, so that we can reference it in callbacks
+	currentInstance = this;
+
+	// set callbacks for the bitstream capture
+	bitStream.SetDataFullHandler(WrapperBitStream);
+	bitStream.SetErrorHandler(WrapperBitStreamError);
+
+	// set callbacks for the packet builder
+	dccPacket.SetPacketCompleteHandler(WrapperDCCPacket);
+	dccPacket.SetPacketErrorHandler(WrapperDCCPacketError);
+
+	// configure dcc event handlers
+	dcc.SetBasicAccessoryDecoderPacketHandler(WrapperDCCAccPacket);
+	dcc.SetExtendedAccessoryDecoderPacketHandler(WrapperDCCExtPacket);
+	dcc.SetBasicAccessoryPomPacketHandler(WrapperDCCAccPomPacket);
+	dcc.SetDecodingErrorHandler(WrapperDCCDecodingError);
+
+	// configure other event handlers
+	button.SetButtonPressHandler(WrapperButtonPress);
+	servo.SetServoMoveDoneHandler(WrapperServoMoveDone);
+	servo.SetServoPowerOffHandler(WrapperServoPowerOff);
+	osStraight.SetButtonPressHandler(WrapperOSStraight);
+	osCurved.SetButtonPressHandler(WrapperOSCurved);
+	errorTimer.SetTimerHandler(WrapperErrorTimer);
+	resetTimer.SetTimerHandler(WrapperResetTimer);
 }
 
 
@@ -31,7 +56,7 @@ void TurnoutMgr::Initialize()
     // check for button hold on startup (for reset to defaults)
     if (button.RawState() == LOW) 
     {
-        FactoryReset();
+        FactoryReset(true);    // perform a complete reset
     }
     else
     {
@@ -77,9 +102,12 @@ void TurnoutMgr::Update()
             bitStream.Suspend();
             bitStream.Resume();
 
-			// set up timer for LED indication, normal led will resume after this timer expires
-			errorTimer.StartTimer(2000);
-			led.SetLED(RgbLed::YELLOW, RgbLed::FLASH);
+			if (showErrorIndication)
+			{
+				// set up timer for LED indication, normal led will resume after this timer expires
+				errorTimer.StartTimer(2000);
+				led.SetLED(RgbLed::YELLOW, RgbLed::FLASH);
+			}
 		}
 
         lastMillis = currentMillis;
@@ -122,31 +150,6 @@ void TurnoutMgr::InitMain()
         dcc.GetCV(CV_servoHighSpeed) * 100,
         servoState);
 
-    // set pointer to this instance of the turnout manager, so that we can reference it in callbacks
-    currentInstance = this;
-
-    // set callbacks for the bitstream capture
-    bitStream.SetDataFullHandler(WrapperBitStream);
-    bitStream.SetErrorHandler(WrapperBitStreamError);
-
-    // set callbacks for the packet builder
-    dccPacket.SetPacketCompleteHandler(WrapperDCCPacket);
-    dccPacket.SetPacketErrorHandler(WrapperDCCPacketError);
-
-    // configure dcc event handlers
-    dcc.SetBasicAccessoryDecoderPacketHandler(WrapperDCCAccPacket);
-    dcc.SetExtendedAccessoryDecoderPacketHandler(WrapperDCCExtPacket);
-    dcc.SetBasicAccessoryPomPacketHandler(WrapperDCCAccPomPacket);
-    dcc.SetDecodingErrorHandler(WrapperDCCDecodingError);
-
-    // configure other event handlers
-    button.SetButtonPressHandler(WrapperButtonPress);
-    servo.SetServoMoveDoneHandler(WrapperServoMoveDon);
-    servo.SetServoPowerOffHandler(WrapperServoPowerOff);
-    osStraight.SetButtonPressHandler(WrapperOSStraight);
-    osCurved.SetButtonPressHandler(WrapperOSCurved);
-    errorTimer.SetTimerHandler(WrapperErrorTimer);
-
     // initlize led and relays
     SetRelays();
 
@@ -164,7 +167,7 @@ void TurnoutMgr::InitMain()
 
 
 // perform a reset to factory defaults
-void TurnoutMgr::FactoryReset()
+void TurnoutMgr::FactoryReset(bool HardReset)
 {
 #ifdef _DEBUG
     Serial.println("Reset to defaults initiated.");
@@ -175,15 +178,23 @@ void TurnoutMgr::FactoryReset()
 
     // normal initilization will resume after this timer expires
     resetTimer.StartTimer(resetDelay);
-    resetTimer.SetTimerHandler(WrapperResetTimer);
+    led.SetLED(RgbLed::MAGENTA, RgbLed::FLASH);
 
-    led.SetLED(RgbLed::BLUE, RgbLed::FLASH);
+	// suspend bitstream in case of soft reset
+	bitStream.Suspend();
 
-    // do the reset
+	// reset vars for soft reset
+	bitErrorCount = 0;
+	packetErrorCount = 0;
+	lastMillis = 0;
+	showErrorIndication = true;
+
+	// do the cv reset
     unsigned int numCVs = sizeof(FactoryDefaultCVs)/sizeof(CVPair);
     for (unsigned int cv = 0; cv < numCVs; cv++)
     {
-        dcc.SetCV( FactoryDefaultCVs[cv].CV, FactoryDefaultCVs[cv].Value);
+		if (HardReset || FactoryDefaultCVs[cv].SoftReset)
+	       dcc.SetCV(FactoryDefaultCVs[cv].CV, FactoryDefaultCVs[cv].Value);
     }
 
 #ifdef _DEBUG
@@ -214,10 +225,6 @@ void TurnoutMgr::SetRelays()
 // set the turnout to a new position (also disables relays prior to starting servo motion)
 void TurnoutMgr::SetServo(bool ServoRate)
 {
-    // suspend the bitstream capture, since the servo/led related interrupts cause timing errors in the bitstream.
-    // bitstream capture is resumed in the ServoPowerOffHandler method.
-    bitStream.Suspend();
-
     // turn off the relays
     relayStraight.SetPin(LOW);
     relayCurved.SetPin(LOW);
@@ -261,6 +268,12 @@ void TurnoutMgr::ErrorTimerHandler()
     led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::ON);
 }
 
+
+// do things when the servo starts up
+void TurnoutMgr::ServoStartupHandler()
+{
+	bitStream.Suspend();  // suspend the bitstream to free up Timer1 for servo usage
+}
 
 // do things after the servo is powered off
 void TurnoutMgr::ServoPowerOffHandler()
@@ -403,6 +416,15 @@ void TurnoutMgr::DCCExtCommandHandler(unsigned int Addr, unsigned int Data)
 		return;
 	}
 
+
+	// process a matching signal aspect to perform a soft reset
+	if (Data == softResetSignalAspect)
+	{
+		FactoryReset(false);
+		return;
+	}
+
+
 	// an invalid signal aspect was received, provide an error indication
 	errorTimer.StartTimer(1000);
 	led.SetLED(RgbLed::YELLOW, RgbLed::ON);
@@ -496,7 +518,8 @@ void TurnoutMgr::WrapperDCCPacketError(byte errorCode)
 // sensor/timer callback wrappers
 
 void TurnoutMgr::WrapperButtonPress(bool ButtonState) { currentInstance->ButtonEventHandler(ButtonState); }
-void TurnoutMgr::WrapperServoMoveDon() { currentInstance->ServoMoveDoneHandler(); }
+void TurnoutMgr::WrapperServoStartup() { currentInstance->ServoStartupHandler(); }
+void TurnoutMgr::WrapperServoMoveDone() { currentInstance->ServoMoveDoneHandler(); }
 void TurnoutMgr::WrapperServoPowerOff() { currentInstance->ServoPowerOffHandler(); }
 void TurnoutMgr::WrapperResetTimer() { currentInstance->ResetTimerHandler(); }
 void TurnoutMgr::WrapperErrorTimer() { currentInstance->ErrorTimerHandler(); }
