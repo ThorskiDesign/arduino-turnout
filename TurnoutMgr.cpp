@@ -41,6 +41,7 @@ TurnoutMgr::TurnoutMgr():
 
 	// configure other event handlers
 	button.SetButtonPressHandler(WrapperButtonPress);
+	servo.SetServoStartupHandler(WrapperServoStartup);
 	servo.SetServoMoveDoneHandler(WrapperServoMoveDone);
 	servo.SetServoPowerOffHandler(WrapperServoPowerOff);
 	osStraight.SetButtonPressHandler(WrapperOSStraight);
@@ -347,8 +348,7 @@ void TurnoutMgr::OSCurvedHandler(bool ButtonState)
 void TurnoutMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
 {
     // assume we are filtering repeated packets in the packet builder, so we don't check for that here
-
-    if (Addr != dccAddress) return;   // exit if this command is not for our address
+	// assume DCCdecoder is set to return only packets for this decoder's address.
 
     State dccState;
     dccState = (Direction == 0) ? CURVED : STRAIGHT;
@@ -383,8 +383,7 @@ void TurnoutMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
 void TurnoutMgr::DCCExtCommandHandler(unsigned int Addr, unsigned int Data)
 {
 	// assume we are filtering repeated packets in the packet builder, so we don't check for that here
-
-	if (Addr != dccAddress) return;   // exit if this command is not for our address
+	// assume DCCdecoder is set to return only packets for this decoder's address.
 
 #ifdef _DEBUG
 	Serial.print("Received dcc signal apsect command, value ");
@@ -417,10 +416,14 @@ void TurnoutMgr::DCCExtCommandHandler(unsigned int Addr, unsigned int Data)
 	}
 
 
-	// process a matching signal aspect to perform a soft reset
-	if (Data == softResetSignalAspect)
+	// process a matching signal aspect to toggle error indication
+	if (Data == dcc.GetCV(CV_errorIndicationToggle))
 	{
-		FactoryReset(false);
+		showErrorIndication = !showErrorIndication;
+
+		// set up timer for LED indication, normal led will resume after this timer expires
+		errorTimer.StartTimer(1000);
+		led.SetLED(RgbLed::BLUE, RgbLed::ON);
 		return;
 	}
 
@@ -435,8 +438,7 @@ void TurnoutMgr::DCCExtCommandHandler(unsigned int Addr, unsigned int Data)
 void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value)
 {
     // assume we are filtering repeated packets in the packet builder, so we don't check for that here
-
-    if (Addr != dccAddress) return;   // exit if this command is not for our address
+	// assume DCCdecoder is set to return only packets for this decoder's address.
 
 #ifdef _DEBUG
     Serial.print("In class callback for dcc program on main, CV: ");
@@ -444,6 +446,21 @@ void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV
     Serial.print(", Value: ");
     Serial.println(Value, DEC);
 #endif
+
+	// check for and perform cv commanded reset
+	if (CV == CV_reset)
+	{
+		if (Value == CV_softResetValue)
+		{
+			FactoryReset(false);
+			return;
+		}
+		if (Value == CV_hardResetValue)
+		{
+			FactoryReset(true);
+			return;
+		}
+	}
 
     // check against our defined CVs to verify that the CV is valid
     boolean isValidCV = false;

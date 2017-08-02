@@ -153,6 +153,8 @@ private:
 	bool showErrorIndication = true;           // enable or disable LED error indications
 
 	// define our available cv's  (allowable range 33-81 per 9.2.2)
+	const byte CV_AddressLSB = 1;
+	const byte CV_AddressMSB = 9;
 	const byte CV_servoMinTravel = 33;
 	const byte CV_servoMaxTravel = 34;
 	const byte CV_servoLowSpeed = 35;
@@ -165,6 +167,8 @@ private:
 	const byte CV_Aux1On = 42;
 	const byte CV_Aux2Off = 43;
 	const byte CV_Aux2On = 44;
+	const byte CV_positionIndicationToggle = 45;
+	const byte CV_errorIndicationToggle = 46;
 	const byte CV_turnoutPosition = 50;
 
 	// set up default cv's
@@ -176,11 +180,14 @@ private:
 	};
 
 	// factory default settings
-	const byte softResetSignalAspect = 31;     //  signal aspect value for soft reset
-	CVPair FactoryDefaultCVs [15] =
+	const byte CV_reset = 55;
+	const byte CV_softResetValue = 11;
+	const byte CV_hardResetValue = 55;
+
+	CVPair FactoryDefaultCVs [17] =
 	{
-		{kCV_AddressLSB, 1, false},    // defined in DCCdecoder.h, default to address = 1
-		{kCV_AddressMSB, 0, false},    // defined in DCCdecoder.h
+		{CV_AddressLSB, 1, false},
+		{CV_AddressMSB, 0, false},
 		{CV_servoMinTravel, 90, false},
 		{CV_servoMaxTravel, 90, false},
 		{CV_servoLowSpeed, 25, true},
@@ -193,6 +200,8 @@ private:
 		{CV_Aux1On, 11, true },
 		{CV_Aux2Off, 20, true },
 		{CV_Aux2On, 21, true },
+		{CV_positionIndicationToggle, 1, true},
+		{CV_errorIndicationToggle, 2, true},
 		{CV_turnoutPosition, 0, false}
 	};
 
