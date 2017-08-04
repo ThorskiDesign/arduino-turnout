@@ -6,26 +6,24 @@ boolean BitStream::lastPinState = 0;
 SimpleQueue BitStream::simpleQueue;
 
 
-// set up the bitstream capture
-BitStream::BitStream(byte intPin, boolean withPullup)
+// set up the bitstream capture using the ICR and default timings
+BitStream::BitStream(byte InterruptPin, boolean WithPullup)
 {
-	interruptPin = intPin;
+	interruptPin = InterruptPin;
+	pinMode(interruptPin, WithPullup ? INPUT_PULLUP : INPUT);
+}
 
-	// configure pins
-	if (withPullup)
-	{
-		pinMode(interruptPin, INPUT_PULLUP);
-	}
-	else
-	{
-		pinMode(interruptPin, INPUT);
-	}
+
+// set up the bitstream capture
+BitStream::BitStream(byte InterruptPin, boolean WithPullup, boolean UseICR) : BitStream(InterruptPin, WithPullup)
+{
+	useICR = UseICR;
 }
 
 
 // set up the bitstream capture with non-default timings
-BitStream::BitStream(byte interruptPin, boolean withPullup, unsigned int OneMin, unsigned int OneMax,
-	unsigned int ZeroMin, unsigned int ZeroMax, byte MaxErrors) : BitStream(interruptPin, withPullup)
+BitStream::BitStream(byte InterruptPin, boolean WithPullup, boolean UseICR, unsigned int OneMin, unsigned int OneMax, 
+	unsigned int ZeroMin, unsigned int ZeroMax, byte MaxErrors) : BitStream(InterruptPin, WithPullup, UseICR)
 {
 	timeOneMin = OneMin * CLOCK_SCALE_FACTOR;
 	timeOneMax = OneMax * CLOCK_SCALE_FACTOR;
@@ -93,8 +91,14 @@ void BitStream::Resume()
 
 	// set starting time and configure interrupt
 	lastInterruptCount = TCNT1;
-	//attachInterrupt(digitalPinToInterrupt(interruptPin), GetIrqTimestamp, CHANGE);
-	TIMSK1 |= (1 << 5);  // enable input capture interrupt
+	if (useICR)
+	{
+		TIMSK1 |= (1 << 5);  // enable input capture interrupt
+	}
+	else
+	{
+		attachInterrupt(digitalPinToInterrupt(interruptPin), GetIrqTimestamp, CHANGE);   // enable h/w interrupt
+	}
 
 	interrupts();
 }

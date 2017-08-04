@@ -92,12 +92,15 @@ public:
     typedef void (*DataFullHandler)(unsigned long BitData);
     typedef void (*ErrorHandler)(byte ErrorCode);
 
+	// set up the bitstream capture using the ICR and default timings
+	BitStream(byte InterruptPin, boolean WithPullup);
+
     // set up the bitstream capture
-    BitStream(byte interruptPin, boolean withPullup);
+    BitStream(byte interruptPin, boolean withPullup, boolean useICR);
 
     // set up the bitstream capture with non-default timings
-    BitStream(byte interruptPin, boolean withPullup,
-        unsigned int OneMin, unsigned int OneMax, unsigned int ZeroMin, unsigned int ZeroMax, byte MaxErrors);
+    BitStream(byte interruptPin, boolean withPullup, boolean useICR,
+		unsigned int OneMin, unsigned int OneMax, unsigned int ZeroMin, unsigned int ZeroMax, byte MaxErrors);
 
     // configure the callback handlers
     void SetDataFullHandler(DataFullHandler Handler);
@@ -131,6 +134,7 @@ private:
     ErrorHandler errorHandler = 0;          // handler for errors
 
     // Interrupt and state variables
+	boolean useICR = true;                  // use the input capture register rather than the hardware interrupt
     byte interruptPin;                      // the pin for the hardware irq
     State state = SUSPEND;                  // current state of the acquisition
 	unsigned int lastInterruptCount = 0;    // Timer1 count at the last interrupt
