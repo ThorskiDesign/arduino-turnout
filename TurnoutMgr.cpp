@@ -96,7 +96,15 @@ void TurnoutMgr::Update()
         Serial.print("     Packet Error Count: ");
         Serial.println(packetErrorCount, DEC);
 #endif
-        // if we see repeated packet errors, reset bitream capture
+		// indicate bit errors
+		if ((bitErrorCount > maxBitErrors) && showErrorIndication)
+		{
+			// set up timer for LED indication, normal led will resume after this timer expires
+			errorTimer.StartTimer(250);
+			led.SetLED(RgbLed::YELLOW, RgbLed::ON);
+		}
+
+        // if we see repeated packet errors, reset bitstream capture
         if (packetErrorCount > maxPacketErrors)
         {
 			// assume we lost sync on the bitstream, reset the bitstream capture

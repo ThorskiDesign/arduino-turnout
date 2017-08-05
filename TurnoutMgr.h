@@ -138,6 +138,7 @@ private:
     // bitstream and packet builder related
     unsigned long bitErrorCount = 0;
     unsigned long packetErrorCount = 0;
+	const byte maxBitErrors = 10;         // number of bit errors before indication
     const byte maxPacketErrors = 10;      // number of packet errors before bitstream reset
     unsigned long lastMillis = 0;         // for tracking refresh interval for error counts
 
