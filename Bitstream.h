@@ -17,8 +17,8 @@ is performed to provide the data.
 
 Example usage:
 
-    BitStream bitStream(DCCPin, false);                           // bitstream capture object, default timings
-    BitStream bitStream(DCCPin, false, 48, 68, 88, 10000, 10);    // bitstream capture object, non-standard timings
+    BitStream bitStream(DCCPin, false);                 // create bitstream using ICR and default timings
+    BitStream bitStream(DCCPin, false, true 48, 68, 88, 10000, 10);    // create bitstream using non-standard timings
     bitStream.Resume();                                 // start the bitstream capture
 	bitStream.Suspend();                                // stop the bitstream capture
 	bitStream.ProcessTimeStamps();					    // process any DCC timestamps in the queue
@@ -68,9 +68,9 @@ other interrupts may affect the timing of this interrupt. The timing based on th
 
 // defines for direct port access and hardware debugging pulses
 #define HW_IRQ_PORT() PIND & 0x04                                                    // direct access h/w port pin 2
-#define HW_DEBUG_PULSE() { PORTB = PORTB | (1 << 4); PORTB = PORTB & ~(1 << 4); }    // pulse pin 12
-#define HW_DEBUG_PULSE_ON() PORTB = PORTB | (1 << 4)                                 // set pin 12 high
-#define HW_DEBUG_PULSE_OFF() PORTB = PORTB & ~(1 << 4)                               // set pin 12 low
+#define HW_DEBUG_PULSE() { PORTD = PORTD | (1 << 0); PORTD = PORTD & ~(1 << 0); }    // pulse pin 0
+#define HW_DEBUG_PULSE_ON() PORTD = PORTD | (1 << 0)                                 // set pin 0 high
+#define HW_DEBUG_PULSE_OFF() PORTD = PORTD & ~(1 << 0)                               // set pin 0 low
 
 #define ERR_INVALID_HALF_BIT             1
 #define ERR_SEQUENTIAL_ERROR_LIMIT       2

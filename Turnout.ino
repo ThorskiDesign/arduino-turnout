@@ -10,16 +10,16 @@ TurnoutMgr TurnoutManager;
 void setup()
 {
 #ifdef _DEBUG
-    Serial.begin(115200);
+    // for timing tests
+    pinMode(0,OUTPUT);
+	pinMode(1,OUTPUT);
+
+	Serial.begin(115200);
 	delay(1000);   // delay for Serial.print in factory reset (??)
 #endif
 
     // initialize the turnout manager
     TurnoutManager.Initialize();
-
-    // for timing tests
-    pinMode(12,OUTPUT);
-	pinMode(13,OUTPUT);
 }
 
 

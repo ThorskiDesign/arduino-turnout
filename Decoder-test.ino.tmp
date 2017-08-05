@@ -9,9 +9,9 @@
 // Bitstream setup ==========================================================================
 
 // global stuff
-const byte intPin = 2;
-BitStream bitStream(intPin, false, 48, 68, 88, 10000, 10);
-//BitStream bitStream(intPin, false);
+const byte intPin = 8;
+//BitStream bitStream(intPin, false, false, 48, 68, 88, 10000, 10);
+BitStream bitStream(intPin, false);
 DCCpacket dccpacket(true, true, 250);
 DCCdecoder dcc;
 
@@ -100,23 +100,28 @@ void DCC_AccPomHandler(int boardAddress,int outputAddress, byte instructionType,
 //
 void setup()
 {
-    Serial.begin(115200);
+	//pinMode(0, OUTPUT);
+	//pinMode(1, OUTPUT);
+
+	Serial.begin(115200);
 
     bitStream.SetDataFullHandler(&BitStreamHandler);
     bitStream.SetErrorHandler(&BitErrorHandler);
+	Serial.println("bitstream setup complete.");
 
     dccpacket.SetPacketCompleteHandler(&MainPacketHandler);
     dccpacket.SetPacketErrorHandler(&MainPacketErrorHandler);
+	Serial.println("packet builder setup complete.");
 
     dcc.SetupDecoder(0,0,0,true);
     dcc.SetBasicAccessoryDecoderPacketHandler(&DCC_AccessoryDecoderHandler);
     dcc.SetExtendedAccessoryDecoderPacketHandler(&DCC_ExtendedAccDecoderHandler);
     dcc.SetBaselineControlPacketHandler(&DCC_BaselineControlHandler);
     dcc.SetBasicAccessoryPomPacketHandler(&DCC_AccPomHandler);
+	Serial.println("dcc decoder setup complete.");
 
 	bitStream.Resume();    // start the bitstream capture
-	
-	pinMode(12, OUTPUT);
+	Serial.println("bitstream capture started.");
 }
 
 

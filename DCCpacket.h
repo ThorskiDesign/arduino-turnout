@@ -55,11 +55,6 @@ and its timestamp are added to the log, and the method returns false.
 #endif
 
 
-// defines for hardware debugging pulses
-#define HW_DEBUG_PULSE() { PORTB = PORTB | (1 << 4); PORTB = PORTB & ~(1 << 4); }    // pulse pin 12
-#define HW_DEBUG_PULSE_ON() PORTB = PORTB | (1 << 4)                                 // set pin 12 high
-#define HW_DEBUG_PULSE_OFF() PORTB = PORTB & ~(1 << 4)                               // set pin 12 low
-
 // Min and max valid packet lengths
 #define PACKET_LEN_MIN              2   // zero indexed
 #define PACKET_LEN_MAX              5   // zero indexed

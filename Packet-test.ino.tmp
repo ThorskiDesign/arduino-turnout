@@ -32,7 +32,7 @@ static unsigned long lastMillis = millis();
 
 // global stuff
 const byte intPin = 8;
-//BitStream bitStream(intPin, false, 48, 68, 88, 10000, 10);
+//BitStream bitStream(intPin, false, false, 48, 68, 88, 10000, 10);
 BitStream bitStream(intPin, false);
 DCCpacket dccpacket(true,false,100);
 
@@ -205,6 +205,9 @@ void DumpAndResetTable()
 //
 void setup()
 {
+    //pinMode(0, OUTPUT);
+    //pinMode(1, OUTPUT);
+
     Serial.begin(115200);
 
     bitStream.SetDataFullHandler(&BitStreamHandler);
@@ -212,9 +215,6 @@ void setup()
 
     dccpacket.SetPacketCompleteHandler(&RawPacketHandler);
     dccpacket.SetPacketErrorHandler(&MainPacketErrorHandler);
-
-    pinMode(12, OUTPUT);
-    pinMode(13, OUTPUT);
 
     bitStream.Resume();    // start the bitstream capture
 }
