@@ -68,17 +68,23 @@ other interrupts may affect the timing of this interrupt. The timing based on th
 
 // defines for direct port access and hardware debugging pulses
 #define HW_IRQ_PORT() PIND & 0x04                                                    // direct access h/w port pin 2
-#define HW_DEBUG_PULSE() { PORTD = PORTD | (1 << 0); PORTD = PORTD & ~(1 << 0); }    // pulse pin 0
-#define HW_DEBUG_PULSE_ON() PORTD = PORTD | (1 << 0)                                 // set pin 0 high
-#define HW_DEBUG_PULSE_OFF() PORTD = PORTD & ~(1 << 0)                               // set pin 0 low
+//#define HW_DEBUG_PULSE() { PORTD = PORTD | (1 << 0); PORTD = PORTD & ~(1 << 0); }    // pulse pin 0
+//#define HW_DEBUG_PULSE_ON() PORTD = PORTD | (1 << 0)                                 // set pin 0 high
+//#define HW_DEBUG_PULSE_OFF() PORTD = PORTD & ~(1 << 0)                               // set pin 0 low
+#define HW_DEBUG_PULSE() { PORTC = PORTC | (1 << 4); PORTC = PORTC & ~(1 << 4); }    // pulse pin 18
+#define HW_DEBUG_PULSE_ON() PORTC = PORTC | (1 << 4)                                 // set pin 18 high
+#define HW_DEBUG_PULSE_OFF() PORTC = PORTC & ~(1 << 4)                               // set pin 18 low
 
 #define ERR_INVALID_HALF_BIT             1
-#define ERR_SEQUENTIAL_ERROR_LIMIT       2
+#define ERR_INVALID_HALF_BIT_LOW         2
+#define ERR_INVALID_HALF_BIT_MID         3
+#define ERR_INVALID_HALF_BIT_HIGH        4
+#define ERR_SEQUENTIAL_ERROR_LIMIT       10
 
 #define DCC_DEFAULT_ONE_MIN				52
 #define DCC_DEFAULT_ONE_MAX				64
 #define DCC_DEFAULT_ZERO_MIN			90
-#define DCC_DEFAULT_ZERO_MAX			10000    // 110 us for normal bit, 10000 us to allow zero-stretching
+#define DCC_DEFAULT_ZERO_MAX			120    // 110 us for normal bit, 10000 us to allow zero-stretching
 
 //#define CLOCK_SCALE_FACTOR				2U       // number of clock ticks per microsecond
 //                                                 // 8 prescaler gives a 0.5 us interval
@@ -119,8 +125,9 @@ private:
     // states
     enum State
     {
-        NORMAL,
-        SUSPEND
+        NORMAL,     // normal operating mode, can only add bits to output queue while in normal mode
+        SUSPEND,    // operation suspended and interrupts cancelled
+		STARTUP     // just started up, looking for first pulse
     };
 
     // DCC microsecond 0 & 1 timings

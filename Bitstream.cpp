@@ -22,7 +22,7 @@ BitStream::BitStream(byte InterruptPin, boolean WithPullup, boolean UseICR) : Bi
 
 
 // set up the bitstream capture with non-default timings
-BitStream::BitStream(byte InterruptPin, boolean WithPullup, boolean UseICR, unsigned int OneMin, unsigned int OneMax, 
+BitStream::BitStream(byte InterruptPin, boolean WithPullup, boolean UseICR, unsigned int OneMin, unsigned int OneMax,
 	unsigned int ZeroMin, unsigned int ZeroMax, byte MaxErrors) : BitStream(InterruptPin, WithPullup, UseICR)
 {
 	timeOneMin = OneMin * CLOCK_SCALE_FACTOR;
@@ -108,12 +108,10 @@ void BitStream::Resume()
 void BitStream::ProcessTimestamps()
 {
 	// generate debugging pulses on scope to monitor simpleQueue size.
-	//if (simpleQueue.Size()>0) HW_DEBUG_PULSE();
-	//if (simpleQueue.Size()>1) HW_DEBUG_PULSE();
-	//if (simpleQueue.Size()>2) HW_DEBUG_PULSE();
-	//if (simpleQueue.Size()>3) HW_DEBUG_PULSE();
-	//if (simpleQueue.Size()>4) HW_DEBUG_PULSE();
-	//if (simpleQueue.Size()>5) HW_DEBUG_PULSE();
+	//for (int i = 0; i < simpleQueue.Size(); i++)
+	//{
+	//	HW_DEBUG_PULSE();
+	//}
 
 	while (simpleQueue.Size() > 0)
 	{
@@ -157,9 +155,15 @@ void BitStream::ProcessTimestamps()
 		}
 		else    // didn't get a valid half bit, so begin error handling
 		{
+			// classify the error
+			byte errorNum = 0;
+			if (period < timeOneMin) errorNum = ERR_INVALID_HALF_BIT_LOW;
+			if ((period > timeOneMax) && (period < timeZeroMin)) errorNum = ERR_INVALID_HALF_BIT_MID;
+			if (period > timeZeroMax) errorNum = ERR_INVALID_HALF_BIT_HIGH;
+
 			// callback error handler
 			if (errorHandler)
-				errorHandler(ERR_INVALID_HALF_BIT);
+				errorHandler(errorNum);
 
 			bitErrorCount++;        // increment error count
 			if (bitErrorCount > maxBitErrors)
@@ -227,7 +231,6 @@ ISR(TIMER1_CAPT_vect)        // static, global
 {
 	unsigned int capture = ICR1;    // store the capture register before we do anything else
 	TCCR1B ^= 0x40;                 // toggle the edge select bit,  (1<<6) = 0x40
-	TIFR1 |= 0x20;                  // clear the input capture flag by writing a one to it,  (1<<5) = 0x20
 
 	BitStream::simpleQueue.Put(capture);      // add the value in the input capture register to the queue
 }
