@@ -118,7 +118,6 @@ public:
 
 	// process the raw timestamp queue
 	void ProcessTimestamps();
-	void ProcessTimestampsOld();
 
 	static SimpleQueue simpleQueue;         // queue for the DCC timestamps
 
