@@ -118,6 +118,7 @@ public:
 
 	// process the raw timestamp queue
 	void ProcessTimestamps();
+	void ProcessTimestampsOld();
 
 	static SimpleQueue simpleQueue;         // queue for the DCC timestamps
 
@@ -130,7 +131,22 @@ private:
 		STARTUP     // just started up, looking for first pulse
     };
 
-    // DCC microsecond 0 & 1 timings
+	// state pointer and functions
+	typedef void(BitStream::*StateFunctionPointer)();
+	StateFunctionPointer stateFunctionPointer = 0;
+	void StateStartup();
+	void StateSeek();
+	void StateNormal();
+	void HandleError();
+
+	unsigned int currentCount = 0;
+	unsigned int period = 0;
+	boolean isOne = false;
+	boolean isZero = false;
+	byte seekCycles = 0;
+
+	
+	// DCC microsecond 0 & 1 timings
     unsigned int timeOneMin = DCC_DEFAULT_ONE_MIN * CLOCK_SCALE_FACTOR;
     unsigned int timeOneMax = DCC_DEFAULT_ONE_MAX * CLOCK_SCALE_FACTOR;
     unsigned int timeZeroMin = DCC_DEFAULT_ZERO_MIN * CLOCK_SCALE_FACTOR;
