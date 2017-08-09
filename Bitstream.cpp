@@ -82,7 +82,7 @@ void BitStream::Resume()
 
 	// set the startup state
 	simpleQueue.Reset();    // reset the queue of DCC timestamps
-	stateFunctionPointer = StateStartup;
+	stateFunctionPointer = &BitStream::StateStartup;
 
 	// set starting time and configure interrupt
 	if (useICR)
@@ -113,7 +113,7 @@ void BitStream::StateStartup()
 
 		// set half bit and begin loooking for transition
 		lastHalfBit = isOne;
-		stateFunctionPointer = StateSeek;
+		stateFunctionPointer = &BitStream::StateSeek;
 	}
 
 	// ignore bit errors here, just save the last interrupt time and keep looking
@@ -131,7 +131,7 @@ void BitStream::StateSeek()
 		if (isOne != lastHalfBit)
 		{
 			endOfBit = true;   // transitioned from 1 to 0 or vice versa, so the next half bit is the bit end
-			stateFunctionPointer = StateNormal;
+			stateFunctionPointer = &BitStream::StateNormal;
 		}
 
 		// save the last half bit
@@ -140,7 +140,7 @@ void BitStream::StateSeek()
 	else
 	{
 		// error occurred looking for transition, go back to startup
-		stateFunctionPointer = StateStartup;
+		stateFunctionPointer = &BitStream::StateStartup;
 	}
 
 	// save the last interrupt time
@@ -204,7 +204,7 @@ void BitStream::HandleError()
 	{
 		// exceeded max bit errors, reset the timestamp queue and go back to startup state
 		simpleQueue.Reset();
-		stateFunctionPointer = StateStartup;
+		stateFunctionPointer = &BitStream::StateStartup;
 
 		// callback error handler
 		if (errorHandler)
