@@ -102,12 +102,10 @@ void BitStream::Resume()
 void BitStream::StateStartup()
 {
 	// check for valid half bit and use it to initialize lastHalfBit
-	// collect a few timestamps before we start looking
-	seekCycles++;
-	if ((isOne || isZero) && seekCycles > 5)
+	// this effectively ignores any initial bit errors during startup, etc.
+	if (isOne || isZero)
 	{
 		// initialize state vars
-		seekCycles = 0;
 		endOfBit = false;
 		bitErrorCount = 0;
 
@@ -115,9 +113,6 @@ void BitStream::StateStartup()
 		lastHalfBit = isOne;
 		stateFunctionPointer = &BitStream::StateSeek;
 	}
-
-	// ignore bit errors here, just save the last interrupt time and keep looking
-	lastInterruptCount = currentCount;
 }
 
 
@@ -142,12 +137,10 @@ void BitStream::StateSeek()
 		// error occurred looking for transition, go back to startup
 		stateFunctionPointer = &BitStream::StateStartup;
 	}
-
-	// save the last interrupt time
-	lastInterruptCount = currentCount;
 }
 
 
+// normal processing for half bits
 void BitStream::StateNormal()
 {
 	// check for valid half bit
@@ -181,12 +174,10 @@ void BitStream::StateNormal()
 	{
 		HandleError();    // didn't get a valid 1 or 0, process the error
 	}
-
-	// save the time of the last interrupt
-	lastInterruptCount = currentCount;
 }
 
 
+// handle errors that occur during normal processing
 void BitStream::HandleError()
 {
 	// classify the error
@@ -202,8 +193,7 @@ void BitStream::HandleError()
 	bitErrorCount++;        // increment error count
 	if (bitErrorCount > maxBitErrors)
 	{
-		// exceeded max bit errors, reset the timestamp queue and go back to startup state
-		simpleQueue.Reset();
+		// exceeded max bit errors, go back to startup state
 		stateFunctionPointer = &BitStream::StateStartup;
 
 		// callback error handler
@@ -234,7 +224,12 @@ void BitStream::ProcessTimestamps()
 		isOne = (period >= timeOneMin && period <= timeOneMax);
 		isZero = (period >= timeZeroMin && period <= timeZeroMax);
 
-		(*this.*stateFunctionPointer)();
+		// perform the current state function
+		if (stateFunctionPointer)
+			(*this.*stateFunctionPointer)();
+
+		// save the time of the last interrupt
+		lastInterruptCount = currentCount;
 	}
 }
 
@@ -260,6 +255,7 @@ void BitStream::QueuePut(boolean newBit)
 }
 
 
+// get pulse timings using hardware interrupt
 void BitStream::GetIrqTimestamp()    // static
 {
 	// get the timer count before we do anything else
@@ -279,6 +275,7 @@ void BitStream::GetIrqTimestamp()    // static
 }
 
 
+// get pulse timings using input capture register
 ISR(TIMER1_CAPT_vect)        // static, global
 {
 	unsigned int capture = ICR1;    // store the capture register before we do anything else
