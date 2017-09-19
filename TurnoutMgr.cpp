@@ -8,10 +8,13 @@
 
 // TurnoutMgr constructor
 TurnoutMgr::TurnoutMgr() :
-	servo(ServoPWMPin, ServoPowerPin)
+	servo(Servo1Pin, ServoPowerPin),
+	osStraight(Sensor1Pin, true),
+	osCurved(Sensor2Pin, true),
+	relayStraight(Relay1Pin),
+	relayCurved(Relay2Pin)
 {
 	// set pointer to this instance of the turnout manager, so that we can reference it in callbacks
-	TurnoutBase::currentInstance = this;
 	currentInstance = this;
 
 	// configure sensor/servo event handlers
@@ -27,6 +30,33 @@ TurnoutMgr::TurnoutMgr() :
 	dcc.SetExtendedAccessoryDecoderPacketHandler(WrapperDCCExtPacket);
 	dcc.SetBasicAccessoryPomPacketHandler(WrapperDCCAccPomPacket);
 	dcc.SetDecodingErrorHandler(WrapperDCCDecodingError);
+
+	// set callbacks for the bitstream capture
+	bitStream.SetDataFullHandler(WrapperBitStream);
+	bitStream.SetErrorHandler(WrapperBitStreamError);
+
+	// set callbacks for the packet builder
+	dccPacket.SetPacketCompleteHandler(WrapperDCCPacket);
+	dccPacket.SetPacketErrorHandler(WrapperDCCPacketError);
+
+	// configure timer event handlers
+	errorTimer.SetTimerHandler(WrapperErrorTimer);
+	resetTimer.SetTimerHandler(WrapperResetTimer);
+}
+
+
+// Check for factory reset, then proceed with main initialization
+void TurnoutMgr::Initialize()
+{
+	// check for button hold on startup (for reset to defaults)
+	if (button.RawState() == LOW)
+	{
+		FactoryReset(true);    // perform a complete reset
+	}
+	else
+	{
+		InitMain();
+	}
 }
 
 
@@ -37,8 +67,10 @@ void TurnoutMgr::Update()
 	// do all the updates that TurnoutBase handles
 	TurnoutBase::Update();
 
-	// then do our servo update here
+	// then update our sensors and servo
     unsigned long currentMillis = millis();
+	osStraight.Update(currentMillis);
+	osCurved.Update(currentMillis);
     servo.Update(currentMillis);
 }
 
@@ -50,21 +82,22 @@ void TurnoutMgr::InitMain()
 	TurnoutBase::InitMain();
 
 	// servo setup - get extents, rates, and last position from cv's
-	State servoState = position;
-	if (servoEndPointSwap)
-		servoState = (servoState == STRAIGHT) ? CURVED : STRAIGHT;  // swap the servo endpoints if needed
 	servo.Initialize(
-		dcc.GetCV(CV_servoMinTravel),
-		dcc.GetCV(CV_servoMaxTravel),
+		dcc.GetCV(CV_servo1MinTravel),
+		dcc.GetCV(CV_servo1MaxTravel),
 		dcc.GetCV(CV_servoLowSpeed) * 100,
 		dcc.GetCV(CV_servoHighSpeed) * 100,
-		servoState);
+		position);
 
 	// initlize led and relays
 	SetRelays();
 
 	// finally, kick off the bitstream capture
 	bitStream.Resume();
+
+#ifdef _DEBUG
+	Serial.println("TurnoutMgr init done.");
+#endif
 }
 
 
@@ -95,14 +128,11 @@ void TurnoutMgr::SetServo(bool ServoRate)
     relayCurved.SetPin(LOW);
 
     // set the servo
-    State servoState = position;
-    if (servoEndPointSwap) 
-        servoState = (servoState == STRAIGHT) ? CURVED : STRAIGHT;  // swap the servo endpoints if needed
-    servo.Set(servoState, ServoRate);
+    servo.Set(position, ServoRate);
 
 #ifdef _DEBUG
     Serial.print("Setting servo to ");
-    Serial.print(servoState, DEC);
+    Serial.print(position, DEC);
     Serial.print(" at rate ");
     Serial.println(ServoRate, DEC);
 #endif
@@ -233,8 +263,8 @@ void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV
 	TurnoutBase::DCCPomHandler(Addr, instType, CV, Value);
 
 	// update servo vars from eeprom
-	if (CV == CV_servoMinTravel) servo.SetExtent(LOW, dcc.GetCV(CV_servoMinTravel));
-	if (CV == CV_servoMaxTravel) servo.SetExtent(HIGH, dcc.GetCV(CV_servoMaxTravel));
+	if (CV == CV_servo1MinTravel) servo.SetExtent(LOW, dcc.GetCV(CV_servo1MinTravel));
+	if (CV == CV_servo1MaxTravel) servo.SetExtent(HIGH, dcc.GetCV(CV_servo1MaxTravel));
 	if (CV == CV_servoLowSpeed) servo.SetDuration(LOW, dcc.GetCV(CV_servoLowSpeed) * 100);
 	if (CV == CV_servoHighSpeed) servo.SetDuration(HIGH, dcc.GetCV(CV_servoHighSpeed) * 100);
 }
@@ -243,7 +273,7 @@ void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV
 
 // ========================================================================================================
 
-TurnoutMgr* TurnoutMgr::currentInstance = 0;    // pointer to allow us to access member objects from callbacks
+TurnoutMgr *TurnoutMgr::currentInstance = 0;    // pointer to allow us to access member objects from callbacks
 
 // servo/sensor callback wrappers
 void TurnoutMgr::WrapperButtonPress(bool ButtonState) { currentInstance->ButtonEventHandler(ButtonState); }
@@ -282,3 +312,34 @@ void TurnoutMgr::WrapperDCCDecodingError(byte errorCode)
 #endif
 }
 
+
+// wrappers for callbacks in TurnoutBase ================================================================
+
+// this is called from the bitstream capture when there are 32 bits to process.
+void TurnoutMgr::WrapperBitStream(unsigned long incomingBits)
+{
+	currentInstance->dccPacket.ProcessIncomingBits(incomingBits);
+}
+
+void TurnoutMgr::WrapperBitStreamError(byte errorCode)
+{
+	currentInstance->bitErrorCount++;
+}
+
+
+// this is called by the packet builder when a complete packet is ready, to kick off the actual decoding
+void TurnoutMgr::WrapperDCCPacket(byte *packetData, byte size)
+{
+	// kick off the packet processor
+	currentInstance->dcc.ProcessPacket(packetData, size);
+}
+
+void TurnoutMgr::WrapperDCCPacketError(byte errorCode)
+{
+	currentInstance->packetErrorCount++;
+}
+
+
+// timer callback wrappers
+void TurnoutMgr::WrapperResetTimer() { currentInstance->ResetTimerHandler(); }
+void TurnoutMgr::WrapperErrorTimer() { currentInstance->ErrorTimerHandler(); }

@@ -78,21 +78,14 @@ instance of the turnout manager, where the actual callback handling takes place.
 #include "WProgram.h"
 #endif
 
-#include "Bitstream.h"
-#include "DCCpacket.h"
-#include "DCCdecoder.h"
-#include "TurnoutServo.h"
-#include "RGB_LED.h"
-#include "Button.h"
-#include "OutputPin.h"
-#include "EventTimer.h"
 #include "TurnoutBase.h"
 
 
-class TurnoutMgr : public TurnoutBase
+class TurnoutMgr : protected TurnoutBase
 {
 public:
 	TurnoutMgr();
+	void Initialize();
 	void Update();
 
 private:
@@ -103,6 +96,10 @@ private:
 
 	// Sensors and outputs
 	TurnoutServo servo;
+	Button osStraight;
+	Button osCurved;
+	OutputPin relayStraight;
+	OutputPin relayCurved;
 
 	// event handlers
 	void ServoStartupHandler();
@@ -115,7 +112,7 @@ private:
 	void DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value);
 
 	// pointer to allow us to access member objects from callbacks
-	static TurnoutMgr* currentInstance;
+	static TurnoutMgr *currentInstance;
 
 	// Turnout manager event handler wrappers
 	static void WrapperButtonPress(bool ButtonState);
@@ -125,11 +122,23 @@ private:
     static void WrapperServoMoveDone();
     static void WrapperServoPowerOff();
 
-	// DCC event handler wrappers in main
+	// DCC event handler wrappers
 	static void WrapperDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte data);
 	static void WrapperDCCExtPacket(int boardAddress, int outputAddress, byte data);
 	static void WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byte instructionType, int cv, byte data);
 	static void WrapperDCCDecodingError(byte errorCode);
+
+	// wrappers for callbacks in TurnoutBase ================================================================
+
+	// callbacks for bitstream and packet builder
+	static void WrapperBitStream(unsigned long incomingBits);
+	static void WrapperBitStreamError(byte errorCode);
+	static void WrapperDCCPacket(byte *packetData, byte size);
+	static void WrapperDCCPacketError(byte errorCode);
+
+	// Turnout manager event handler wrappers
+	static void WrapperResetTimer();
+	static void WrapperErrorTimer();
 };
 
 #endif
