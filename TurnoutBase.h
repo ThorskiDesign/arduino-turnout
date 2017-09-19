@@ -21,41 +21,37 @@
 
 class TurnoutBase
 {
-public:
-	TurnoutBase();
-	void Initialize();
-	void Update();
-
 protected:
+	TurnoutBase();
+
 	// Hardware assignments
 	const byte Aux1Pin = 0;
 	const byte Aux2Pin = 1;
 	const byte ButtonPin = 3;
 	const byte ServoPowerPin = 4;
-	const byte ServoPWMPin = 5;
-	const byte LedPinB = 6;
-	const byte LedPinR = 7;
+	const byte Servo1Pin = 5;
+	const byte LedBPin = 6;
+	const byte LedRPin = 7;
 	const byte DCCPin = 8;
-	const byte Servo2PWMPin = 9;
-	const byte Servo3PWMPin = 10;
-	const byte Servo4PWMPin = 11;
-	const byte LedPinG = 12;
-	const byte RelayStraightPin = 14;
-	const byte RelayCurvedPin = 15;
-	const byte OSstraightPin = 16;
-	const byte OScurvedPin = 17;
+	const byte Servo2Pin = 9;
+	const byte Servo3Pin = 10;
+	const byte Servo4Pin = 11;
+	const byte LedGPin = 12;
+	const byte Relay1Pin = 14;
+	const byte Relay2Pin = 15;
+	const byte Sensor1Pin = 16;
+	const byte Sensor2Pin = 17;
+	const byte Relay3Pin = 18;
+	const byte Relay4Pin = 19;
 
 	// main functions
 	void InitMain();
+	void Update();
 	void FactoryReset(bool HardReset);
 
 	// Sensors and outputs
 	Button button;
-	Button osStraight;
-	Button osCurved;
 	RgbLed led;
-	OutputPin relayStraight;
-	OutputPin relayCurved;
 	OutputPin auxOutput1;
 	OutputPin auxOutput2;
 	EventTimer resetTimer;
@@ -77,7 +73,6 @@ protected:
 	enum State { STRAIGHT, CURVED };
 	byte dccAddress = 1;                       // the dcc address of the decoder
 	State position = STRAIGHT;                 // the current or commanded position of the switch
-	bool servoEndPointSwap = false;            // optionally swap the low/high servo endpoints
 	bool occupancySensorSwap = false;          // optionally swap the straight/curved occupancy sensors
 	bool dccCommandSwap = false;               // optionally swap the meaning of received dcc commands
 	bool relaySwap = false;					   // optionally swap the straight/curved relays
@@ -87,11 +82,10 @@ protected:
 	// define our available cv's  (allowable range 33-81 per 9.2.2)
 	const byte CV_AddressLSB = 1;
 	const byte CV_AddressMSB = 9;
-	const byte CV_servoMinTravel = 33;
-	const byte CV_servoMaxTravel = 34;
+	const byte CV_servo1MinTravel = 33;
+	const byte CV_servo1MaxTravel = 34;
 	const byte CV_servoLowSpeed = 35;
 	const byte CV_servoHighSpeed = 36;
-	const byte CV_servoEndPointSwap = 37;
 	const byte CV_occupancySensorSwap = 38;
 	const byte CV_dccCommandSwap = 39;
 	const byte CV_relaySwap = 40;
@@ -126,11 +120,10 @@ protected:
 	{
 		{ CV_AddressLSB, 1, false },
 		{ CV_AddressMSB, 0, false },
-		{ CV_servoMinTravel, 90, false },
-		{ CV_servoMaxTravel, 90, false },
+		{ CV_servo1MinTravel, 90, false },
+		{ CV_servo1MaxTravel, 90, false },
 		{ CV_servoLowSpeed, 25, true },
 		{ CV_servoHighSpeed, 0, true },
-		{ CV_servoEndPointSwap, 0, true },
 		{ CV_occupancySensorSwap, 0, true },
 		{ CV_dccCommandSwap, 0, true },
 		{ CV_relaySwap, 0, true },
@@ -155,19 +148,6 @@ protected:
 	void DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value);
 	void ResetTimerHandler();
 	void ErrorTimerHandler();
-
-	// pointer to allow us to access member objects from callbacks
-	static TurnoutBase* currentInstance;
-
-	// callbacks for bitstream and packet builder
-	static void WrapperBitStream(unsigned long incomingBits);
-	static void WrapperBitStreamError(byte errorCode);
-	static void WrapperDCCPacket(byte *packetData, byte size);
-	static void WrapperDCCPacketError(byte errorCode);
-
-	// Turnout manager event handler wrappers
-	static void WrapperResetTimer();
-	static void WrapperErrorTimer();
 };
 
 #endif
