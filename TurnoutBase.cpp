@@ -11,43 +11,13 @@
 // TurnoutMgr constructor
 TurnoutBase::TurnoutBase() :
 	button(ButtonPin, true),
-	osStraight(OSstraightPin, true),
-	osCurved(OScurvedPin, true),
-	led(LedPinR, LedPinG, LedPinB),
-	relayStraight(RelayStraightPin),
-	relayCurved(RelayCurvedPin),
+	led(LedRPin, LedGPin, LedBPin),
 	auxOutput1(Aux1Pin),
 	auxOutput2(Aux2Pin),
 	bitStream(DCCPin, false),                           // bitstream capture object
 	dccPacket(true, true, 250),                         // DCC packet builder
 	dcc()                                               // DCC packet processor
 {
-	// set callbacks for the bitstream capture
-	bitStream.SetDataFullHandler(WrapperBitStream);
-	bitStream.SetErrorHandler(WrapperBitStreamError);
-
-	// set callbacks for the packet builder
-	dccPacket.SetPacketCompleteHandler(WrapperDCCPacket);
-	dccPacket.SetPacketErrorHandler(WrapperDCCPacketError);
-
-	// configure timer event handlers
-	errorTimer.SetTimerHandler(WrapperErrorTimer);
-	resetTimer.SetTimerHandler(WrapperResetTimer);
-}
-
-
-// Check for factory reset, then proceed with main initialization
-void TurnoutBase::Initialize()
-{
-	// check for button hold on startup (for reset to defaults)
-	if (button.RawState() == LOW)
-	{
-		FactoryReset(true);    // perform a complete reset
-	}
-	else
-	{
-		InitMain();
-	}
 }
 
 
@@ -68,8 +38,6 @@ void TurnoutBase::Update()
 
 	// update sensors
 	button.Update(currentMillis);
-	osStraight.Update(currentMillis);
-	osCurved.Update(currentMillis);
 
 	// check/reset error counts
 	if (currentMillis - lastMillis > 1000)
@@ -123,7 +91,6 @@ void TurnoutBase::InitMain()
 
 	// get variables from cv's
 	dccAddress = dcc.Address();
-	servoEndPointSwap = dcc.GetCV(CV_servoEndPointSwap);
 	occupancySensorSwap = dcc.GetCV(CV_occupancySensorSwap);
 	dccCommandSwap = dcc.GetCV(CV_dccCommandSwap);
 	relaySwap = dcc.GetCV(CV_relaySwap);
@@ -132,7 +99,7 @@ void TurnoutBase::InitMain()
 	position = (dcc.GetCV(CV_turnoutPosition) == 0) ? STRAIGHT : CURVED;
 
 #ifdef _DEBUG
-	Serial.print("DCC init done, using dcc address ");
+	Serial.print("Base init done, using dcc address ");
 	Serial.println(dccAddress, DEC);
 	Serial.print("Servo position read from CVs is ");
 	Serial.println(position, DEC);
@@ -308,43 +275,7 @@ void TurnoutBase::DCCPomHandler(unsigned int Addr, byte instType, unsigned int C
 
 	// read back values from eeprom
 	dccAddress = dcc.Address();
-	servoEndPointSwap = dcc.GetCV(CV_servoEndPointSwap);
 	occupancySensorSwap = dcc.GetCV(CV_occupancySensorSwap);
 	dccCommandSwap = dcc.GetCV(CV_dccCommandSwap);
 	relaySwap = dcc.GetCV(CV_relaySwap);
 }
-
-
-// callbacks for bitstream and packet builder =============================================================
-
-TurnoutBase* TurnoutBase::currentInstance = 0;    // pointer to allow us to access member objects from callbacks
-
-// this is called from the bitstream capture when there are 32 bits to process.
-void TurnoutBase::WrapperBitStream(unsigned long incomingBits)
-{
-	currentInstance->dccPacket.ProcessIncomingBits(incomingBits);
-}
-
-void TurnoutBase::WrapperBitStreamError(byte errorCode)
-{
-	currentInstance->bitErrorCount++;
-}
-
-
-// this is called by the packet builder when a complete packet is ready, to kick off the actual decoding
-void TurnoutBase::WrapperDCCPacket(byte *packetData, byte size)
-{
-	// kick off the packet processor
-	currentInstance->dcc.ProcessPacket(packetData, size);
-}
-
-void TurnoutBase::WrapperDCCPacketError(byte errorCode)
-{
-	currentInstance->packetErrorCount++;
-}
-
-
-// ========================================================================================================
-// timer callback wrappers
-void TurnoutBase::WrapperResetTimer() { currentInstance->ResetTimerHandler(); }
-void TurnoutBase::WrapperErrorTimer() { currentInstance->ErrorTimerHandler(); }
