@@ -66,8 +66,7 @@ void TurnoutMgr::Initialize()
 }
 
 
-// check for new bitstream data, update sensors and outputs, check for
-// max number of packet errors and reset bitstream capture if necessary
+// update sensors and outputs
 void TurnoutMgr::Update()
 {
 	// process any DCC interrupts that have been timestamped
