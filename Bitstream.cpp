@@ -51,7 +51,7 @@ void BitStream::SetErrorHandler(ErrorHandler Handler)
 void BitStream::Suspend()
 {
 	noInterrupts();
-	state = SUSPEND;
+	stateFunctionPointer = 0;
 	detachInterrupt(digitalPinToInterrupt(interruptPin));   // disable the h/w interrupt
 	TIMSK1 = 0;                                             // disable input capture interrupt
 	interrupts();
@@ -61,8 +61,6 @@ void BitStream::Suspend()
 // begin or resume processing interrupts
 void BitStream::Resume()
 {
-	if (state != SUSPEND) return;   // skip resume if we aren't already suspended
-
 	noInterrupts();
 
 	// Configure timer1 for use in getting interrupt timing.
@@ -78,19 +76,15 @@ void BitStream::Resume()
 	TCCR1B |= (1 << 6);  // set input capture edge select bit for rising
 	TCCR1B |= (1 << 7);  // set input capture noise canceler
 
-	// reset state and bitstream vars
-	state = NORMAL;
-	lastHalfBit = 0;
-	endOfBit = false;
-	bitErrorCount = 0;
-	simpleQueue.Reset();    // reset the queue of DCC timestamps
-
 	// initialize the outgoing queue
 	queueSize = 0;
 	bitData = 0;
 
+	// set the startup state
+	simpleQueue.Reset();    // reset the queue of DCC timestamps
+	stateFunctionPointer = &BitStream::StateStartup;
+
 	// set starting time and configure interrupt
-	lastInterruptCount = TCNT1;
 	if (useICR)
 	{
 		TIMSK1 |= (1 << 5);  // enable input capture interrupt
@@ -101,6 +95,111 @@ void BitStream::Resume()
 	}
 
 	interrupts();
+}
+
+
+// initialize state and get the value for the first half bit
+void BitStream::StateStartup()
+{
+	// check for valid half bit and use it to initialize lastHalfBit
+	// this effectively ignores any initial bit errors during startup, etc.
+	if (isOne || isZero)
+	{
+		// initialize state vars
+		endOfBit = false;
+		bitErrorCount = 0;
+
+		// set half bit and begin loooking for transition
+		lastHalfBit = isOne;
+		stateFunctionPointer = &BitStream::StateSeek;
+	}
+}
+
+
+// find the first 1/0 or 0/1 transition, after initializing lastHalfBit
+void BitStream::StateSeek()
+{
+	// check for valid half bit
+	if (isOne || isZero)
+	{
+		// check for transition from previous to current half bits
+		if (isOne != lastHalfBit)
+		{
+			endOfBit = true;   // transitioned from 1 to 0 or vice versa, so the next half bit is the bit end
+			stateFunctionPointer = &BitStream::StateNormal;
+		}
+
+		// save the last half bit
+		lastHalfBit = isOne;
+	}
+	else
+	{
+		// error occurred looking for transition, go back to startup
+		stateFunctionPointer = &BitStream::StateStartup;
+	}
+}
+
+
+// normal processing for half bits
+void BitStream::StateNormal()
+{
+	// check for valid half bit
+	if (isOne || isZero)
+	{
+		// now we have validated we have a 1 or 0, so isOne represents our current half bit
+
+		// check if the current and previous half bits match
+		if (isOne == lastHalfBit)
+		{
+			if (endOfBit)             // is this the ending half bit?
+			{
+				QueuePut(isOne);      // add the bit to the queue
+				endOfBit = false;
+				bitErrorCount = 0;    // reset error count after full valid bit
+			}
+			else
+			{
+				endOfBit = true;      // this wasn't the ending half bit, so the next one will be
+			}
+		}
+		else
+		{
+			endOfBit = true;   // transitioned from 1 to 0 or vice versa, so the next half bit is the bit end
+		}
+
+		// save the last half bit
+		lastHalfBit = isOne;
+	}
+	else
+	{
+		HandleError();    // didn't get a valid 1 or 0, process the error
+	}
+}
+
+
+// handle errors that occur during normal processing
+void BitStream::HandleError()
+{
+	// classify the error
+	byte errorNum = 0;
+	if (period < timeOneMin) errorNum = ERR_INVALID_HALF_BIT_LOW;
+	if ((period > timeOneMax) && (period < timeZeroMin)) errorNum = ERR_INVALID_HALF_BIT_MID;
+	if (period > timeZeroMax) errorNum = ERR_INVALID_HALF_BIT_HIGH;
+
+	// callback error handler
+	if (errorHandler)
+		errorHandler(errorNum);
+
+	bitErrorCount++;        // increment error count
+	if (bitErrorCount > maxBitErrors)
+	{
+		// exceeded max bit errors, go back to startup state
+		stateFunctionPointer = &BitStream::StateStartup;
+
+		// callback error handler
+		if (errorHandler)
+			errorHandler(ERR_SEQUENTIAL_ERROR_LIMIT);
+	}
 }
 
 
@@ -116,74 +215,22 @@ void BitStream::ProcessTimestamps()
 	while (simpleQueue.Size() > 0)
 	{
 		// get the current timestamp to check
-		unsigned int currentCount = simpleQueue.Get();
+		currentCount = simpleQueue.Get();
 
 		// get the period between the current and last timestamps
-		unsigned int period = currentCount - lastInterruptCount;
+		period = currentCount - lastInterruptCount;
 
 		// does the period give a 1 or a 0?
-		boolean isOne = (period >= timeOneMin && period <= timeOneMax);
-		boolean isZero = (period >= timeZeroMin && period <= timeZeroMax);
+		isOne = (period >= timeOneMin && period <= timeOneMax);
+		isZero = (period >= timeZeroMin && period <= timeZeroMax);
 
-		// check for valid half bit
-		if (isOne || isZero)
-		{
-			// now we have validated we have a 1 or 0, so isOne represents our current half bit
+		// perform the current state function
+		if (stateFunctionPointer)
+			(*this.*stateFunctionPointer)();
 
-			// check if the current and previous half bits match
-			if (isOne == lastHalfBit)
-			{
-				if (endOfBit)             // is this the ending half bit?
-				{
-					QueuePut(isOne);      // add the bit to the queue
-					endOfBit = false;
-					bitErrorCount = 0;    // reset error count after full valid bit
-				}
-				else
-				{
-					endOfBit = true;      // this wasn't the ending half bit, so the next one will be
-				}
-			}
-			else
-			{
-				endOfBit = true;   // transitioned from 1 to 0 or vice versa, so the next half bit is the bit end
-			}
-
-			// save the time of the last valid interrupt and half bit
-			lastInterruptCount = currentCount;
-			lastHalfBit = isOne;
-		}
-		else    // didn't get a valid half bit, so begin error handling
-		{
-			// classify the error
-			byte errorNum = 0;
-			if (period < timeOneMin) errorNum = ERR_INVALID_HALF_BIT_LOW;
-			if ((period > timeOneMax) && (period < timeZeroMin)) errorNum = ERR_INVALID_HALF_BIT_MID;
-			if (period > timeZeroMax) errorNum = ERR_INVALID_HALF_BIT_HIGH;
-
-			// callback error handler
-			if (errorHandler)
-				errorHandler(errorNum);
-
-			bitErrorCount++;        // increment error count
-			if (bitErrorCount > maxBitErrors)
-			{
-				// normally assume an error is an intermittent event, and don't reset lastInterrupt time,
-				// so that the next 'real' interrupt still has a valid starting point.
-				// but, if we have > maxBitErros, assume something bad happened and set it here,
-				// so that the subsequent period is based on the latest irq time.
-				lastInterruptCount = currentCount;
-				simpleQueue.Reset();
-
-				// callback error handler
-				if (errorHandler)
-					errorHandler(ERR_SEQUENTIAL_ERROR_LIMIT);
-			}
-		}
-
-		// 6 - 8 us per timestamp
-
-	}     // end while
+		// save the time of the last interrupt
+		lastInterruptCount = currentCount;
+	}
 }
 
 
@@ -208,6 +255,7 @@ void BitStream::QueuePut(boolean newBit)
 }
 
 
+// get pulse timings using hardware interrupt
 void BitStream::GetIrqTimestamp()    // static
 {
 	// get the timer count before we do anything else
@@ -227,6 +275,7 @@ void BitStream::GetIrqTimestamp()    // static
 }
 
 
+// get pulse timings using input capture register
 ISR(TIMER1_CAPT_vect)        // static, global
 {
 	unsigned int capture = ICR1;    // store the capture register before we do anything else

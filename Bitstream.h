@@ -25,21 +25,30 @@ Example usage:
 
 Details:
 
-In the NORMAL mode, the ISR is called on each transition of the DCC signal and captures timestamps 
-of the DCC events in a queue. The edge select bit of the capture register is toggled each time in 
-the ISR, so that both rising and falling edges are captured. The timestamp queue is examined for a 
-matching pair of half bits that makes up a full bit. When a complete bit is found, it is added to the
-output queue. Error checking is performed on each half bit. If a half bit does not fall within the 
-valid ranges for a 0 or 1, a callback is triggered and a counter incremented. After a configurable 
-number of consecutive bit errors, another callback is triggered and the timestamp queue is reset. 
-The bit error count is reset after each complete bit. The timestamp queue, period calculations, etc. 
-are done using unsigned int so that the Timer1 overflow is handled transparently.
+Timestamps for the DCC signal transitions are captured and then inspected to determine if they
+represent a one or a zero bit. The caputure can be configured to use either the input capture 
+register or a hardware interrupt. In either case, the ISR is called on each transition of the DCC 
+signal and captures timestamps of the DCC events in a queue. The edge select bit of the capture 
+register is toggled each time in the ISR, so that both rising and falling edges are captured. The 
+hardware interrupt is similarly configured on CHANGE.
+
+The inspection of the timestamps is performed in three states. In the startup state, pulses are
+inspected to find the first valid half bit. After this, processing proceeds to the seek state, where
+the bits are examined for a transition from 1 to 0 or from 0 to 1, in order to establish which half bit
+of each pair is the ending half bit. At this point, the state is synced to the bitstream and normal 
+processing begins. In the normal mode, the timestamp queue is examined for a matching pair of half 
+bits that makes up a full bit. When a complete bit is found, it is added to the output queue. Error 
+checking is performed on each half bit. If a half bit does not fall within the valid ranges for a 
+0 or 1, a callback is triggered and a counter incremented. After a configurable number of consecutive 
+bit errors, another callback is triggered and processing reverts to the startup state. The bit error 
+count is reset after each complete bit. The timestamp queue, period calculations, etc. are done 
+using unsigned int so that the Timer1 overflow is handled transparently.
 
 Suspend/Resume methods allow starting, stopping, or resetting the bitstream capture, depending
 on outside factors (for example, during times when the signal may be degraded, or when other higher
-priority processing needs to take place). The input capture interrupt is disabled when suspended, and
-enabled when resumed. Timer1 is configured in the Resume method, so that it can be used for other
-purposes (e.g. servo) when the bitstream capture is suspended.
+priority processing needs to take place). The input capture or hardware interrupt is disabled when 
+suspended, and enabled when resumed. Timer1 is configured in the Resume method, so that it can be 
+used for other purposes (e.g. servo) when the bitstream capture is suspended.
 
 The output queue is an unsigned long, into which 32 bits are stored as they are received. The queue is
 shifted left each time a bit is added, so the bits are stored left to right in the order in which 
@@ -122,15 +131,24 @@ public:
 	static SimpleQueue simpleQueue;         // queue for the DCC timestamps
 
 private:
-    // states
-    enum State
-    {
-        NORMAL,     // normal operating mode, can only add bits to output queue while in normal mode
-        SUSPEND,    // operation suspended and interrupts cancelled
-		STARTUP     // just started up, looking for first pulse
-    };
+	// state pointer and functions
+	typedef void(BitStream::*StateFunctionPointer)();
+	StateFunctionPointer stateFunctionPointer = 0;
+	void StateStartup();
+	void StateSeek();
+	void StateNormal();
+	void HandleError();
 
-    // DCC microsecond 0 & 1 timings
+	// bitstream capture vars
+	unsigned int currentCount = 0;          // timer count for the last pulse
+	unsigned int period = 0;                // period of the current pulse
+	boolean isOne = false;                  // pulse is within the limits for a 1
+	boolean isZero = false;                 // pulse is within the limits for a 0
+	unsigned int lastInterruptCount = 0;    // Timer1 count at the last interrupt
+	boolean lastHalfBit = 0;                // the last half bit captured
+	boolean endOfBit = false;               // second half-bit indicator
+
+	// DCC microsecond 0 & 1 timings
     unsigned int timeOneMin = DCC_DEFAULT_ONE_MIN * CLOCK_SCALE_FACTOR;
     unsigned int timeOneMax = DCC_DEFAULT_ONE_MAX * CLOCK_SCALE_FACTOR;
     unsigned int timeZeroMin = DCC_DEFAULT_ZERO_MIN * CLOCK_SCALE_FACTOR;
@@ -140,15 +158,11 @@ private:
     DataFullHandler dataFullHandler = 0;    // handler for the data full event
     ErrorHandler errorHandler = 0;          // handler for errors
 
-    // Interrupt and state variables
+    // Interrupt and error variables
 	boolean useICR = true;                  // use the input capture register rather than the hardware interrupt
     byte interruptPin;                      // the pin for the hardware irq
-    State state = SUSPEND;                  // current state of the acquisition
-	unsigned int lastInterruptCount = 0;    // Timer1 count at the last interrupt
-    boolean lastHalfBit = 0;                // the last half bit captured
-	boolean endOfBit = false;               // second half-bit indicator
     byte bitErrorCount = 0;                 // current number of sequential bit errors
-    byte maxBitErrors = 10;                 // max number of bit errors before we revert to acquire state
+    byte maxBitErrors = 5;                  // max number of bit errors before we revert to startup state
 	static boolean lastPinState;            // last state of the IRQ pin
 
     // Output queue structure
