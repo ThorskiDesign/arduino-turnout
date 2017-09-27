@@ -8,9 +8,9 @@
 
 typedef struct
 {
-    int count;
-    byte validBytes;
-    byte data[6];
+	int count;
+	byte validBytes;
+	byte data[6];
 } DCCPacket;
 
 // The dcc decoder object and global data
@@ -32,9 +32,9 @@ static unsigned long lastMillis = millis();
 
 // global stuff
 const byte intPin = 8;
-//BitStream bitStream(intPin, false, false, 48, 68, 88, 10000, 10);
+//BitStream bitStream(intPin, false, true, 52, 64, 90, 10000, 10);
 BitStream bitStream(intPin, false);
-DCCpacket dccpacket(true,false,100);
+DCCpacket dccpacket(true, false, 100);
 
 
 void BitStreamHandler(unsigned long incomingBits)
@@ -45,9 +45,10 @@ void BitStreamHandler(unsigned long incomingBits)
 
 void BitErrorHandler(byte errorCode)
 {
-    if (gBitErrorCount < 25) 
-        gBitErrorLog[gBitErrorCount] = errorCode;
-    gBitErrorCount++;
+	if (gBitErrorCount < 25)
+		gBitErrorLog[gBitErrorCount] = errorCode;
+	gBitErrorCount++;
+	//Serial.println(errorCode, DEC);
 }
 
 
@@ -56,52 +57,52 @@ void BitErrorHandler(byte errorCode)
 
 void MainPacketErrorHandler(byte errorCode)
 {
-    if (gErrorCount < 25) 
-        gErrorLog[gErrorCount] = errorCode;
-    gErrorCount++;
+	if (gErrorCount < 25)
+		gErrorLog[gErrorCount] = errorCode;
+	gErrorCount++;
 }
 
 void RawPacketHandler(byte *packetBytes, byte byteCount)
 {
-    // Bump global packet count
-    ++gPacketCount;
+	// Bump global packet count
+	++gPacketCount;
 
-    // Walk table and look for a matching packet
-    for ( int i = 0; i < (int)(sizeof(gPackets) / sizeof(gPackets[0])); ++i )
-    {
-        if ( gPackets[i].validBytes )
-        {
-            // Not an empty slot. Does this slot match this packet? If so, bump count.
-            if ( gPackets[i].validBytes == byteCount )
-            {
-                char isPacket = true;
-                for ( int j = 0; j < byteCount; j++)
-                {
-                    if ( gPackets[i].data[j] != packetBytes[j] )
-                    {
-                        isPacket = false;
-                        break;
-                    }
-                }
-                if ( isPacket )
-                {
-                    gPackets[i].count++;
-                    return;
-                }
-            }
-        }
-        else
-        {
-            // Empty slot, just copy over data
-            gPackets[i].count++;
-            gPackets[i].validBytes = byteCount;
-            for ( int j = 0; j < byteCount; j++)
-            {
-                gPackets[i].data[j] = packetBytes[j];
-            }
-            return;
-        }
-    }
+	// Walk table and look for a matching packet
+	for (int i = 0; i < (int)(sizeof(gPackets) / sizeof(gPackets[0])); ++i)
+	{
+		if (gPackets[i].validBytes)
+		{
+			// Not an empty slot. Does this slot match this packet? If so, bump count.
+			if (gPackets[i].validBytes == byteCount)
+			{
+				char isPacket = true;
+				for (int j = 0; j < byteCount; j++)
+				{
+					if (gPackets[i].data[j] != packetBytes[j])
+					{
+						isPacket = false;
+						break;
+					}
+				}
+				if (isPacket)
+				{
+					gPackets[i].count++;
+					return;
+				}
+			}
+		}
+		else
+		{
+			// Empty slot, just copy over data
+			gPackets[i].count++;
+			gPackets[i].validBytes = byteCount;
+			for (int j = 0; j < byteCount; j++)
+			{
+				gPackets[i].data[j] = packetBytes[j];
+			}
+			return;
+		}
+	}
 }
 
 
@@ -113,90 +114,92 @@ void RawPacketHandler(byte *packetBytes, byte byteCount)
 // Helper to make packet strings
 char* MakePacketString(char* buffer60Bytes, byte byteCount, byte* packet)
 {
-    buffer60Bytes[0] = 0;
-    if( byteCount>=kPACKET_LEN_MIN && byteCount<=kPACKET_LEN_MAX )
-    {
-        int i = 0;
-        for(byte byt=0; byt<byteCount; ++byt)
-        {
-            byte bit=0x80;
-            while(bit)
-            {
-                buffer60Bytes[i++] = (packet[byt] & bit) ? '1' : '0';
-                bit=bit>>1;
-            }
-            buffer60Bytes[i++] = ' ';
-        }
-        buffer60Bytes[--i] = 0;
-    }
-    return buffer60Bytes;
+	buffer60Bytes[0] = 0;
+	if (byteCount >= kPACKET_LEN_MIN && byteCount <= kPACKET_LEN_MAX)
+	{
+		int i = 0;
+		for (byte byt = 0; byt < byteCount; ++byt)
+		{
+			byte bit = 0x80;
+			while (bit)
+			{
+				buffer60Bytes[i++] = (packet[byt] & bit) ? '1' : '0';
+				bit = bit >> 1;
+			}
+			buffer60Bytes[i++] = ' ';
+		}
+		buffer60Bytes[--i] = 0;
+	}
+	return buffer60Bytes;
 }
 
 
 
 void DumpAndResetTable()
 {
-    char buffer60Bytes[60];
+	char buffer60Bytes[60];
 
-    Serial.print("Total Packet Count: ");
-    Serial.println(gPacketCount, DEC);
+	Serial.print("Total Packet Count: ");
+	Serial.println(gPacketCount, DEC);
 
-    Serial.print("Idle Packet Count:  ");
-    Serial.println(gIdlePacketCount, DEC);
+	Serial.print("Idle Packet Count:  ");
+	Serial.println(gIdlePacketCount, DEC);
 
-    Serial.print("Bit Error Count:  ");
-    Serial.println(gBitErrorCount, DEC);
+	Serial.print("Bit Error Count:  ");
+	Serial.println(gBitErrorCount, DEC);
 
-    Serial.print("Bit Errors:  ");
-    int numErrors = (gBitErrorCount < 25) ? gBitErrorCount : 25;
-    for (int i = 0; i < numErrors; i++)
-    {
-        Serial.print(gBitErrorLog[i], DEC);
-        Serial.print(" ");
-    }
-    Serial.println();
+	Serial.print("Bit Errors:  ");
+	int numErrors = (gBitErrorCount < 25) ? gBitErrorCount : 25;
+	for (int i = 0; i < numErrors; i++)
+	{
+		Serial.print(gBitErrorLog[i], DEC);
+		Serial.print(" ");
+	}
+	Serial.println();
 
-    Serial.print("Packet Error Count:  ");
-    Serial.println(gErrorCount, DEC);
+	Serial.print("Packet Error Count:  ");
+	Serial.println(gErrorCount, DEC);
 
-    Serial.print("Packet Errors:  ");
-    numErrors = (gErrorCount < 25) ? gErrorCount : 25;
-    for (int i = 0; i < numErrors; i++)
-    {
-        Serial.print(gErrorLog[i], DEC);
-        Serial.print(" ");
-    }
-    Serial.println();
+	Serial.print("Packet Errors:  ");
+	numErrors = (gErrorCount < 25) ? gErrorCount : 25;
+	for (int i = 0; i < numErrors; i++)
+	{
+		Serial.print(gErrorLog[i], DEC);
+		Serial.print(" ");
+	}
+	Serial.println();
 
-    Serial.println("Count    Packet_Data");
-    for ( int i = 0; i < (int)(sizeof(gPackets) / sizeof(gPackets[0])); ++i )
-    {
-        if ( gPackets[i].validBytes > 0 )
-        {
-            Serial.print(gPackets[i].count, DEC);
-            if ( gPackets[i].count < 10 )
-            {
-                Serial.print("        ");
-            } else {
-                if ( gPackets[i].count < 100 )
-                {
-                    Serial.print("       ");
-                } else {
-                    Serial.print("      ");
-                }
-            }
-            Serial.println( MakePacketString(buffer60Bytes, gPackets[i].validBytes, &gPackets[i].data[0]) );
-        }
-        gPackets[i].validBytes = 0;
-        gPackets[i].count = 0;
-    }
-    Serial.println("============================================");
+	Serial.println("Count    Packet_Data");
+	for (int i = 0; i < (int)(sizeof(gPackets) / sizeof(gPackets[0])); ++i)
+	{
+		if (gPackets[i].validBytes > 0)
+		{
+			Serial.print(gPackets[i].count, DEC);
+			if (gPackets[i].count < 10)
+			{
+				Serial.print("        ");
+			}
+			else {
+				if (gPackets[i].count < 100)
+				{
+					Serial.print("       ");
+				}
+				else {
+					Serial.print("      ");
+				}
+			}
+			Serial.println(MakePacketString(buffer60Bytes, gPackets[i].validBytes, &gPackets[i].data[0]));
+		}
+		gPackets[i].validBytes = 0;
+		gPackets[i].count = 0;
+	}
+	Serial.println("============================================");
 
-    gPacketCount = 0;
-    gIdlePacketCount = 0;
-    gLongestPreamble = 0;
-    gErrorCount = 0;
-    gBitErrorCount = 0;
+	gPacketCount = 0;
+	gIdlePacketCount = 0;
+	gLongestPreamble = 0;
+	gErrorCount = 0;
+	gBitErrorCount = 0;
 }
 
 
@@ -205,35 +208,46 @@ void DumpAndResetTable()
 //
 void setup()
 {
-    //pinMode(0, OUTPUT);
-    //pinMode(1, OUTPUT);
+	pinMode(18, OUTPUT);
+	pinMode(19, OUTPUT);
 
-    Serial.begin(115200);
+	Serial.begin(115200);
 
-    bitStream.SetDataFullHandler(&BitStreamHandler);
-    bitStream.SetErrorHandler(&BitErrorHandler);
+	bitStream.SetDataFullHandler(&BitStreamHandler);
+	bitStream.SetErrorHandler(&BitErrorHandler);
 
-    dccpacket.SetPacketCompleteHandler(&RawPacketHandler);
-    dccpacket.SetPacketErrorHandler(&MainPacketErrorHandler);
+	dccpacket.SetPacketCompleteHandler(&RawPacketHandler);
+	dccpacket.SetPacketErrorHandler(&MainPacketErrorHandler);
 
-    bitStream.Resume();    // start the bitstream capture
+	bitStream.Resume();    // start the bitstream capture
 }
 
 
 
 // Main loop   =======================================================================
-
+double y = 0;
 void loop()
 {
+	// add a delay doing some processing...  
+	// approx 500 us, puts 10-15 timestamps in the queue
+	//HW_DEBUG_PULSE_ON();
+	//double x;
+	//for (unsigned int i = 0; i < 4; i++)
+	//{
+	//	x += sin(i);
+	//}
+	//y = x;
+	//HW_DEBUG_PULSE_OFF();
+
 	bitStream.ProcessTimestamps();
 
-    unsigned long currentMillis = millis();
+	unsigned long currentMillis = millis();
 
-    if (currentMillis - lastMillis > 2000 )
-    {
+	if (currentMillis - lastMillis > 2000)
+	{
 		bitStream.Suspend();
-        DumpAndResetTable();
-        lastMillis = millis();
+		DumpAndResetTable();
+		lastMillis = millis();
 		bitStream.Resume();
-    }
+	}
 }
