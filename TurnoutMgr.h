@@ -114,15 +114,17 @@ private:
     // main functions
 	void InitMain();
 	void FactoryReset(bool HardReset);
-	void SetServo(bool ServoRate);
-	void SetRelays();
+	void BeginServoMove();
+	void EndServoMove();
 
 	// Sensors and outputs
 	Button button;
 	Button osStraight;
 	Button osCurved;
 	RgbLed led;
-	TurnoutServo servo;
+	const byte numServos = 1;
+	TurnoutServo servo[1] = { {ServoPWMPin} };
+	OutputPin servoPower;
 	OutputPin relayStraight;
 	OutputPin relayCurved;
 	OutputPin auxOutput1;
@@ -152,6 +154,10 @@ private:
 	bool relaySwap = false;					   // optionally swap the straight/curved relays
 	bool factoryReset = false;                 // is a reset in progress
 	bool showErrorIndication = true;           // enable or disable LED error indications
+	bool servosActive = false;                 // flag to indicate if servos are active or not
+	byte currentServo = 0;                     // the servo that is currently in motion
+	State servoState[1] = { {STRAIGHT} };      // state that each servo will be set to
+	bool servoRate = LOW;                      // rate at which the servos will be set
 
 	// define our available cv's  (allowable range 33-81 per 9.2.2)
 	const byte CV_AddressLSB = 1;
@@ -211,9 +217,7 @@ private:
 	void DCCExtCommandHandler(unsigned int Addr, unsigned int Data);
 	void DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value);
 	void ButtonEventHandler(bool ButtonState);
-	void ServoStartupHandler();
 	void ServoMoveDoneHandler();
-	void ServoPowerOffHandler();
 	void ResetTimerHandler();
 	void ErrorTimerHandler();
 	void OSStraightHandler(bool ButtonState);
@@ -230,9 +234,7 @@ private:
     
     // Turnout manager event handler wrappers
     static void WrapperButtonPress(bool ButtonState);
-	static void WrapperServoStartup();
     static void WrapperServoMoveDone();
-    static void WrapperServoPowerOff();
     static void WrapperResetTimer();
     static void WrapperErrorTimer();
     static void WrapperOSStraight(bool ButtonState);
