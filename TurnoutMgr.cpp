@@ -12,7 +12,7 @@ TurnoutMgr::TurnoutMgr():
 	osStraight(OSstraightPin, true),
 	osCurved(OScurvedPin, true),
 	led(LedPinR, LedPinG, LedPinB),
-	servo(ServoPWMPin, ServoPowerPin),
+	servoPower(ServoPowerPin),
 	relayStraight(RelayStraightPin),
 	relayCurved(RelayCurvedPin),
 	auxOutput1(Aux1Pin),
@@ -40,14 +40,14 @@ TurnoutMgr::TurnoutMgr():
 	dcc.SetDecodingErrorHandler(WrapperDCCDecodingError);
 
 	// configure other event handlers
+	for (byte i = 0; i < numServos; i++)
+		servo[i].SetServoMoveDoneHandler(WrapperServoMoveDone);
 	button.SetButtonPressHandler(WrapperButtonPress);
-	servo.SetServoStartupHandler(WrapperServoStartup);
-	servo.SetServoMoveDoneHandler(WrapperServoMoveDone);
-	servo.SetServoPowerOffHandler(WrapperServoPowerOff);
 	osStraight.SetButtonPressHandler(WrapperOSStraight);
 	osCurved.SetButtonPressHandler(WrapperOSCurved);
 	errorTimer.SetTimerHandler(WrapperErrorTimer);
 	resetTimer.SetTimerHandler(WrapperResetTimer);
+	servoTimer.SetTimerHandler(WrapperServoTimer);
 }
 
 
@@ -75,12 +75,16 @@ void TurnoutMgr::Update()
 
     // do the updates to maintain flashing led and slow servo motion
     unsigned long currentMillis = millis();
-    servo.Update(currentMillis);
     led.Update(currentMillis);
+
+	if (servosActive)
+		for (byte i = 0; i < numServos; i++)
+			servo[i].Update(currentMillis);
 
     // timer updates
     errorTimer.Update(currentMillis);
     resetTimer.Update(currentMillis);
+	servoTimer.Update(currentMillis);
 
     // update sensors
     button.Update(currentMillis);
@@ -152,18 +156,15 @@ void TurnoutMgr::InitMain()
     State servoState = position;
     if (servoEndPointSwap) 
         servoState = (servoState == STRAIGHT) ? CURVED : STRAIGHT;  // swap the servo endpoints if needed
-    servo.Initialize(
+    servo[0].Initialize(
         dcc.GetCV(CV_servoMinTravel),
         dcc.GetCV(CV_servoMaxTravel),
         dcc.GetCV(CV_servoLowSpeed) * 100,
         dcc.GetCV(CV_servoHighSpeed) * 100,
         servoState);
 
-    // initlize led and relays
-    SetRelays();
-
-    // finally, kick off the bitstream capture
-    bitStream.Resume();
+    // set led and relays, and begin bitstream capture
+    EndServoMove();
 
 #ifdef _DEBUG
     Serial.print("DCC init done, using dcc address ");
@@ -212,47 +213,71 @@ void TurnoutMgr::FactoryReset(bool HardReset)
 }
 
 
-// set the led and relays for the current position
-void TurnoutMgr::SetRelays()
+// set the turnout to a new position
+void TurnoutMgr::BeginServoMove()
 {
-    // set the led solid for the current position
-    led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::ON);
+    // store new position to cv
+    dcc.SetCV(CV_turnoutPosition,position);
 
-    // enable the appropriate relay, swapping if needed
-    if ((position == STRAIGHT && !relaySwap) || (position == CURVED && relaySwap)) 
-    {
-        relayStraight.SetPin(HIGH);
-    }
+	// configure the servo settings
+	for (byte i = 0; i < numServos; i++)
+	{
+		servoState[i] = position;
+		if (servoEndPointSwap)
+			servoState[i] = (servoState[i] == STRAIGHT) ? CURVED : STRAIGHT;  // swap the servo endpoints if needed
+	}
 
-    if ((position == CURVED && !relaySwap) || ((position == STRAIGHT) && relaySwap))
-    {
-        relayCurved.SetPin(HIGH);
-    }
+	// set the led to indicate servo is in motion
+	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
+
+	// stop the bitstream capture
+	bitStream.Suspend();
+
+	// turn off the relays
+	relayStraight.SetPin(LOW);
+	relayCurved.SetPin(LOW);
+
+	// start pwm for current positions of all servos
+	for (byte i = 0; i < numServos; i++)
+		servo[i].StartPWM();
+
+	// turn on servo power
+	servoPower.SetPin(HIGH);
+
+	// set the servo index to the first servo and start moving the servos in sequence
+	servosActive = true;
+	currentServo = 0;
+	ServoMoveDoneHandler();
 }
 
 
-// set the turnout to a new position (also disables relays prior to starting servo motion)
-void TurnoutMgr::SetServo(bool ServoRate)
+// resume normal operation after servo motion is complete
+void TurnoutMgr::EndServoMove()
 {
-    // turn off the relays
-    relayStraight.SetPin(LOW);
-    relayCurved.SetPin(LOW);
+	// set the led solid for the current position
+	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::ON);
 
-    // set the servo
-    State servoState = position;
-    if (servoEndPointSwap) 
-        servoState = (servoState == STRAIGHT) ? CURVED : STRAIGHT;  // swap the servo endpoints if needed
-    servo.Set(servoState, ServoRate);
+	// turn off servo power
+	servoPower.SetPin(LOW);
 
-#ifdef _DEBUG
-    Serial.print("Setting servo to ");
-    Serial.print(servoState, DEC);
-    Serial.print(" at rate ");
-    Serial.println(ServoRate, DEC);
-#endif
+	// stop pwm all servos
+	for (byte i = 0; i < numServos; i++)
+		servo[i].StopPWM();
 
-    // store new position to cv
-    dcc.SetCV(CV_turnoutPosition,position);
+	// enable the appropriate relay, swapping if needed
+	if ((position == STRAIGHT && !relaySwap) || (position == CURVED && relaySwap))
+	{
+		relayStraight.SetPin(HIGH);
+	}
+
+	if ((position == CURVED && !relaySwap) || ((position == STRAIGHT) && relaySwap))
+	{
+		relayCurved.SetPin(HIGH);
+	}
+
+	// resume the bitstream capture
+	servosActive = false;
+	bitStream.Resume();
 }
 
 
@@ -278,23 +303,28 @@ void TurnoutMgr::ErrorTimerHandler()
 }
 
 
-// do things when the servo starts up
-void TurnoutMgr::ServoStartupHandler()
-{
-	bitStream.Suspend();  // suspend the bitstream to free up Timer1 for servo usage
-}
-
-// do things after the servo is powered off
-void TurnoutMgr::ServoPowerOffHandler()
-{
-    bitStream.Resume();   // resume the bitstream capture stopped prior to beginning servo motion
-}
-
-
 // do things after the servo finishes moving to its new position
 void TurnoutMgr::ServoMoveDoneHandler() 
 { 
-    SetRelays();          // set the relays for the new position
+	if (currentServo < numServos)
+	{
+#ifdef _DEBUG
+		Serial.print("Setting servo ");
+		Serial.print(currentServo, DEC);
+		Serial.print(" to ");
+		Serial.print(servoState[currentServo], DEC);
+		Serial.print(" at rate ");
+		Serial.println(servoRate, DEC);
+#endif
+
+		servo[currentServo].Set(servoState[currentServo], servoRate);
+		currentServo++;
+	}
+	else
+	{
+		byte servoPowerOffDelay = 500;    // ms
+		servoTimer.StartTimer(servoPowerOffDelay);
+	}
 }
 
 
@@ -309,8 +339,8 @@ void TurnoutMgr::ButtonEventHandler(bool ButtonState)
         {
             // toggle from current position and set new position
             position = (State) !position;
-            led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
-            SetServo(LOW);
+			servoRate = LOW;
+            BeginServoMove();
         }
         else
         {
@@ -331,8 +361,8 @@ void TurnoutMgr::OSStraightHandler(bool ButtonState)
     if (ButtonState == LOW && newPos != position)
     {
         position = newPos;
-        led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
-        SetServo(HIGH);
+		servoRate = HIGH;
+        BeginServoMove();
     }
 }
 
@@ -346,8 +376,8 @@ void TurnoutMgr::OSCurvedHandler(bool ButtonState)
     if (ButtonState == LOW && newPos != position)
     {
         position = newPos;
-        led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
-        SetServo(HIGH);
+		servoRate = HIGH;
+        BeginServoMove();
     }
 }
 
@@ -375,8 +405,8 @@ void TurnoutMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
     {
         // set switch state based on dcc command
         position = dccState;
-        led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
-        SetServo(LOW);
+		servoRate = LOW;
+        BeginServoMove();
     }
     else
     {
@@ -502,10 +532,10 @@ void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV
     relaySwap = dcc.GetCV(CV_relaySwap);
 
     // update servo vars from eeprom
-    if (CV == CV_servoMinTravel) servo.SetExtent(LOW,dcc.GetCV(CV_servoMinTravel));
-	if (CV == CV_servoMaxTravel) servo.SetExtent(HIGH,dcc.GetCV(CV_servoMaxTravel));
-	if (CV == CV_servoLowSpeed) servo.SetDuration(LOW,dcc.GetCV(CV_servoLowSpeed) * 100);
-	if (CV == CV_servoHighSpeed) servo.SetDuration(HIGH,dcc.GetCV(CV_servoHighSpeed) * 100);
+    if (CV == CV_servoMinTravel) servo[0].SetExtent(LOW,dcc.GetCV(CV_servoMinTravel));
+	if (CV == CV_servoMaxTravel) servo[0].SetExtent(HIGH,dcc.GetCV(CV_servoMaxTravel));
+	if (CV == CV_servoLowSpeed) servo[0].SetDuration(LOW,dcc.GetCV(CV_servoLowSpeed) * 100);
+	if (CV == CV_servoHighSpeed) servo[0].SetDuration(HIGH,dcc.GetCV(CV_servoHighSpeed) * 100);
 }
 
 
@@ -543,13 +573,12 @@ void TurnoutMgr::WrapperDCCPacketError(byte errorCode)
 // sensor/timer callback wrappers
 
 void TurnoutMgr::WrapperButtonPress(bool ButtonState) { currentInstance->ButtonEventHandler(ButtonState); }
-void TurnoutMgr::WrapperServoStartup() { currentInstance->ServoStartupHandler(); }
 void TurnoutMgr::WrapperServoMoveDone() { currentInstance->ServoMoveDoneHandler(); }
-void TurnoutMgr::WrapperServoPowerOff() { currentInstance->ServoPowerOffHandler(); }
 void TurnoutMgr::WrapperResetTimer() { currentInstance->ResetTimerHandler(); }
 void TurnoutMgr::WrapperErrorTimer() { currentInstance->ErrorTimerHandler(); }
 void TurnoutMgr::WrapperOSStraight(bool ButtonState) { currentInstance->OSStraightHandler(ButtonState); }
 void TurnoutMgr::WrapperOSCurved(bool ButtonState) { currentInstance->OSCurvedHandler(ButtonState); }
+void TurnoutMgr::WrapperServoTimer() { currentInstance->EndServoMove(); }
 
 
 // ========================================================================================================

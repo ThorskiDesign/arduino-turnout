@@ -3,19 +3,16 @@
 
 
 // Create a new TurnoutServo
-TurnoutServo::TurnoutServo(byte ServoPin, byte PowerPin)
+TurnoutServo::TurnoutServo(byte ServoPin)
 {
     servoPin = ServoPin;
-    powerPin = PowerPin;
 }
 
 
 // Initialize the TurnoutServo (e.g., with values read from eeprom for extents and last position)
 void TurnoutServo::Initialize(byte ExtentLow, byte ExtentHigh, bool Position)
 {
-    pinMode(powerPin, OUTPUT);
 	pinMode(servoPin, OUTPUT);
-	digitalWrite(powerPin, LOW);
 	digitalWrite(servoPin, LOW);
 
 	extent[LOW] = ExtentLow;
@@ -30,9 +27,7 @@ void TurnoutServo::Initialize(byte ExtentLow, byte ExtentHigh, bool Position)
 // Initialize the TurnoutServo (e.g., with values read from eeprom for extents, rates, and last position)
 void TurnoutServo::Initialize(byte ExtentLow, byte ExtentHigh, int DurationLow, int DurationHigh, bool Position)
 {
-    pinMode(powerPin, OUTPUT);
 	pinMode(servoPin, OUTPUT);
-	digitalWrite(powerPin, LOW);
 	digitalWrite(servoPin, LOW);
 	
 	extent[LOW] = ExtentLow;
@@ -47,21 +42,8 @@ void TurnoutServo::Initialize(byte ExtentLow, byte ExtentHigh, int DurationLow, 
 
 
 // Update the servo position to allow slow slewing of servo
-// Power off servo after duration plus delay
 void TurnoutServo::Update(unsigned long CurrentMillis)
 {
-    // if we're off, just return
-    if (servoState == OFF) return;
-
-    // if we're starting, check the time and power on when needed
-    if (servoState == STARTING && CurrentMillis > startTime)
-    {
-        digitalWrite(powerPin, HIGH);
-        servoState = MOVING;          // advance to next state
-        return;
-    }
-
-    // if we're moving, compute the steps needed
     if (servoState == MOVING)
     {
         // check if step interval for the given rate has elapsed
@@ -84,18 +66,6 @@ void TurnoutServo::Update(unsigned long CurrentMillis)
         }
         return;
     }
-
-    // if we're waiting to stop, check time and power off if needed
-    if (servoState == STOPPING && CurrentMillis > stopTime)
-    {
-        servoState = OFF;                    // reset to OFF state
-        digitalWrite(powerPin, LOW);         // disable the servo power
-        detach();                            // stop sending pwm pulses
-		digitalWrite(servoPin, LOW);         // force servo pin low
-
-        // raise the event indicating the servo has been powered off
-        if (servoPowerOffHandler) servoPowerOffHandler();
-    }
 }
 
 
@@ -117,7 +87,7 @@ void TurnoutServo::Set(bool Position, bool Rate)
     // if position is new, start servo motion
     if (Position != positionSet)
     {
-		StartUp(Position, Rate);
+		MoveTo(Position, Rate);
     }
 }
 
@@ -139,32 +109,38 @@ void TurnoutServo::SetExtent(bool Position, byte Extent)
 		Serial.println(positionSet, DEC);
 #endif // _DEBUG
 
-		StartUp(Position, HIGH);
+		MoveTo(Position, HIGH);
 	}
 }
 
 
 // configure and start up servo motion
-void TurnoutServo::StartUp(bool Position, bool Rate)
+void TurnoutServo::MoveTo(bool Position, bool Rate)
 {
-	// exit if already processing a set command
-	if (servoState != OFF) return;
-
-	// callback for startup event
-	if (servoStartupHandler) servoStartupHandler();
-
-	// ensure we are sending pulses for the current position
-	attach(servoPin);
-	write(extent[positionSet]);
+	// exit if not powered on already
+	if (servoState != STARTING) return;
 
 	// update position and rate settings
 	positionSet = Position;
 	rateSet = Rate;
-	
-	// set state and start/stop times
+	servoState = MOVING;
+}
+
+
+void TurnoutServo::StartPWM()
+{
+	// ensure we are sending pulses for the current position
+	attach(servoPin);
+	write(extent[positionSet]);
 	servoState = STARTING;
-	startTime = millis() + servoStartDelay;
-	stopTime = startTime + duration[rateSet] + servoStopDelay;
+}
+
+
+void TurnoutServo::StopPWM()
+{
+	detach();                            // stop sending pwm pulses
+	digitalWrite(servoPin, LOW);         // force servo pin low
+	servoState = OFF;
 }
 
 
@@ -202,13 +178,5 @@ void TurnoutServo::ComputeSteps()
 }
 
 
-// Assign the callback function for when the servo is congfigured to being moving
-void TurnoutServo::SetServoStartupHandler(ServoEventHandler Handler) { servoStartupHandler = Handler; }
-
-
 // Assign the callback function for when servo motion is done
 void TurnoutServo::SetServoMoveDoneHandler(ServoEventHandler Handler) { servoMoveDoneHandler = Handler; }
-
-
-// Assign the callback function for when the servo power is shut off
-void TurnoutServo::SetServoPowerOffHandler(ServoEventHandler Handler) { servoPowerOffHandler = Handler; }
