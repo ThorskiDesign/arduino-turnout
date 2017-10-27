@@ -12,6 +12,7 @@
 TurnoutBase::TurnoutBase() :
 	button(ButtonPin, true),
 	led(LedRPin, LedGPin, LedBPin),
+	servoPower(ServoPowerPin),
 	auxOutput1(Aux1Pin),
 	auxOutput2(Aux2Pin),
 	bitStream(DCCPin, false),                           // bitstream capture object
@@ -35,6 +36,7 @@ void TurnoutBase::Update()
 	// timer updates
 	errorTimer.Update(currentMillis);
 	resetTimer.Update(currentMillis);
+	servoTimer.Update(currentMillis);
 
 	// update sensors
 	button.Update(currentMillis);
