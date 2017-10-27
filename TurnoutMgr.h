@@ -131,6 +131,7 @@ private:
 	OutputPin auxOutput2;
 	EventTimer resetTimer;
 	EventTimer errorTimer;
+	EventTimer servoTimer;
 
 	// DCC bitstream and packet processors
     BitStream bitStream;
@@ -239,6 +240,7 @@ private:
     static void WrapperErrorTimer();
     static void WrapperOSStraight(bool ButtonState);
     static void WrapperOSCurved(bool ButtonState);
+	static void WrapperServoTimer();
 
     // DCC event handler wrappers in main
     static void WrapperDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte data);

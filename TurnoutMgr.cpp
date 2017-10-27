@@ -47,6 +47,7 @@ TurnoutMgr::TurnoutMgr():
 	osCurved.SetButtonPressHandler(WrapperOSCurved);
 	errorTimer.SetTimerHandler(WrapperErrorTimer);
 	resetTimer.SetTimerHandler(WrapperResetTimer);
+	servoTimer.SetTimerHandler(WrapperServoTimer);
 }
 
 
@@ -83,6 +84,7 @@ void TurnoutMgr::Update()
     // timer updates
     errorTimer.Update(currentMillis);
     resetTimer.Update(currentMillis);
+	servoTimer.Update(currentMillis);
 
     // update sensors
     button.Update(currentMillis);
@@ -320,7 +322,8 @@ void TurnoutMgr::ServoMoveDoneHandler()
 	}
 	else
 	{
-		EndServoMove();
+		byte servoPowerOffDelay = 500;    // ms
+		servoTimer.StartTimer(servoPowerOffDelay);
 	}
 }
 
@@ -575,6 +578,7 @@ void TurnoutMgr::WrapperResetTimer() { currentInstance->ResetTimerHandler(); }
 void TurnoutMgr::WrapperErrorTimer() { currentInstance->ErrorTimerHandler(); }
 void TurnoutMgr::WrapperOSStraight(bool ButtonState) { currentInstance->OSStraightHandler(ButtonState); }
 void TurnoutMgr::WrapperOSCurved(bool ButtonState) { currentInstance->OSCurvedHandler(ButtonState); }
+void TurnoutMgr::WrapperServoTimer() { currentInstance->EndServoMove(); }
 
 
 // ========================================================================================================
