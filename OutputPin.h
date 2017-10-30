@@ -26,7 +26,7 @@ Example usage:
 class OutputPin
 {
 public:
-	explicit OutputPin(byte Pin);
+	OutputPin(byte Pin);
 	void SetPin(bool State);
 	bool GetState();
 
