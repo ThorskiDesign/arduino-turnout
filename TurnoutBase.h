@@ -82,7 +82,6 @@ protected:
 	bool showErrorIndication = true;           // enable or disable LED error indications
 	bool servosActive = false;                 // flag to indicate if servos are active or not
 	byte currentServo = 0;                     // the servo that is currently in motion
-	State servoState[1] = { { STRAIGHT } };      // state that each servo will be set to
 	bool servoRate = LOW;                      // rate at which the servos will be set
 
 	// define our available cv's  (allowable range 33-81 per 9.2.2)

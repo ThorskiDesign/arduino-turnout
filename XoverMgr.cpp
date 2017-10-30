@@ -7,13 +7,7 @@
 
 
 // TurnoutMgr constructor
-XoverMgr::XoverMgr() :
-	osAB(Sensor1Pin, true),
-	osCD(Sensor2Pin, true),
-	relayACstraight(Relay1Pin),
-	relayACcurved(Relay2Pin),
-	relayBDstraight(Relay3Pin),
-	relayBDcurved(Relay4Pin)
+XoverMgr::XoverMgr()
 {
 	// set pointer to this instance of the turnout manager, so that we can reference it in callbacks
 	currentInstance = this;
@@ -89,10 +83,10 @@ void XoverMgr::InitMain()
 	// servo setup - get extents, rates, and last position from cv's
 	byte lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
 	byte highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
-	servo[0].Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, StateAC());
-	servo[1].Initialize(dcc.GetCV(CV_servo2MinTravel), dcc.GetCV(CV_servo2MaxTravel), lowSpeed, highSpeed, StateBD());
-	servo[2].Initialize(dcc.GetCV(CV_servo3MinTravel), dcc.GetCV(CV_servo3MaxTravel), lowSpeed, highSpeed, StateAC());
-	servo[3].Initialize(dcc.GetCV(CV_servo4MinTravel), dcc.GetCV(CV_servo4MaxTravel), lowSpeed, highSpeed, StateBD());
+	servo[0].Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, servoState[0][position]);
+	servo[1].Initialize(dcc.GetCV(CV_servo2MinTravel), dcc.GetCV(CV_servo2MaxTravel), lowSpeed, highSpeed, servoState[1][position]);
+	servo[2].Initialize(dcc.GetCV(CV_servo3MinTravel), dcc.GetCV(CV_servo3MaxTravel), lowSpeed, highSpeed, servoState[2][position]);
+	servo[3].Initialize(dcc.GetCV(CV_servo4MinTravel), dcc.GetCV(CV_servo4MaxTravel), lowSpeed, highSpeed, servoState[3][position]);
 
 	// set led and relays, and begin bitstream capture
 	EndServoMove();
@@ -103,89 +97,11 @@ void XoverMgr::InitMain()
 }
 
 
-// set the led and relays for the current position
-//void XoverMgr::SetRelays()
-//{
-//	State stateAC = StateAC();
-//	State stateBD = StateBD();
-//
-//	if (stateAC == STRAIGHT && stateBD == STRAIGHT)            // all turnouts straight
-//	{
-//		led.SetLED(RgbLed::GREEN, RgbLed::ON);
-//		relayACstraight.SetPin(HIGH);
-//		relayBDstraight.SetPin(HIGH);
-//	}
-//	if (stateAC == STRAIGHT && stateBD == CURVED)              // A and C straight, B and D curved
-//	{
-//		led.SetLED(RgbLed::CYAN, RgbLed::ON);
-//		relayACstraight.SetPin(HIGH);
-//		relayBDcurved.SetPin(HIGH);
-//	}
-//	if (stateAC == CURVED && stateBD == STRAIGHT)              // A and C curved, B and D straight
-//	{
-//		led.SetLED(RgbLed::MAGENTA, RgbLed::ON);
-//		relayACcurved.SetPin(HIGH);
-//		relayBDstraight.SetPin(HIGH);
-//	}
-//	if (stateAC == CURVED && stateBD == CURVED)                // all turnouts curved
-//	{
-//		led.SetLED(RgbLed::RED, RgbLed::ON);
-//		relayACcurved.SetPin(HIGH);
-//		relayBDcurved.SetPin(HIGH);
-//	}
-//}
-
-
-TurnoutBase::State XoverMgr::StateAC()
-{
-	return State();
-}
-
-TurnoutBase::State XoverMgr::StateBD()
-{
-	return State();
-}
-
-
-// set the turnout to a new position (also disables relays prior to starting servo motion)
-//void XoverMgr::SetServos(bool ServoRate)
-//{
-//	// turn off the relays
-//	relayACcurved.SetPin(LOW);
-//	relayACstraight.SetPin(LOW);
-//	relayBDcurved.SetPin(LOW);
-//	relayBDstraight.SetPin(LOW);
-//
-//	// set the servos
-//	State stateAC = StateAC();
-//	State stateBD = StateBD();
-//
-//	servoA.Set(stateAC, ServoRate);
-//	servoB.Set(stateBD, ServoRate);
-//	servoC.Set(stateAC, ServoRate);
-//	servoD.Set(stateBD, ServoRate);
-//
-//#ifdef _DEBUG
-//	Serial.print("Setting servos A/C to "); Serial.print(stateAC, DEC);
-//	Serial.print(",  Setting servos B/D to "); Serial.print(stateBD, DEC); 
-//	Serial.print(",  at rate "); Serial.println(ServoRate, DEC);
-//#endif
-//
-//	// TODO: how to store xover position?
-//	// store new position to cv
-//	dcc.SetCV(CV_turnoutPosition, position);
-//}
-
-
 // set the turnout to a new position
 void XoverMgr::BeginServoMove()
 {
 	// store new position to cv
 	dcc.SetCV(CV_turnoutPosition, position);
-
-	// configure the servo settings
-	for (byte i = 0; i < numServos; i++)
-		servoState[i] = position;
 
 	// set the led to indicate servo is in motion
 	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
@@ -194,8 +110,8 @@ void XoverMgr::BeginServoMove()
 	bitStream.Suspend();
 
 	// turn off the relays
-	relayStraight.SetPin(LOW);
-	relayCurved.SetPin(LOW);
+	for (byte i = 0; i < numServos; i++)
+		relay[i].SetPin(LOW);
 
 	// start pwm for current positions of all servos
 	for (byte i = 0; i < numServos; i++)
@@ -224,16 +140,9 @@ void XoverMgr::EndServoMove()
 	for (byte i = 0; i < numServos; i++)
 		servo[i].StopPWM();
 
-	// enable the appropriate relay, swapping if needed
-	if ((position == STRAIGHT && !relaySwap) || (position == CURVED && relaySwap))
-	{
-		relayStraight.SetPin(HIGH);
-	}
-
-	if ((position == CURVED && !relaySwap) || ((position == STRAIGHT) && relaySwap))
-	{
-		relayCurved.SetPin(HIGH);
-	}
+	// enable the appropriate relay
+	for (byte i = 0; i < numServos; i++)
+		relay[i].SetPin(relayState[i][position]);
 
 	// resume the bitstream capture
 	servosActive = false;
@@ -262,7 +171,7 @@ void XoverMgr::ServoMoveDoneHandler()
 		Serial.println(servoRate, DEC);
 #endif
 
-		servo[currentServo].Set(servoState[currentServo], servoRate);
+		servo[currentServo].Set(servoState[currentServo][position], servoRate);
 		currentServo++;
 	}
 	else
@@ -280,7 +189,7 @@ void XoverMgr::ButtonEventHandler(bool ButtonState)
 	if (ButtonState == HIGH)
 	{
 		// proceed only if both occupancy sensors are inactive (i.e., sensors override button press)
-		if (osStraight.SwitchState() == HIGH && osCurved.SwitchState() == HIGH)
+		if (osAB.SwitchState() == HIGH && osCD.SwitchState() == HIGH)
 		{
 			// toggle from current position and set new position
 			position = (State)!position;
@@ -295,6 +204,65 @@ void XoverMgr::ButtonEventHandler(bool ButtonState)
 		}
 	}
 }
+
+
+void XoverMgr::OSABHandler(bool ButtonState)
+{
+}
+
+void XoverMgr::OSCDHandler(bool ButtonState)
+{
+}
+
+
+// handle a DCC basic accessory command, used for changing the state of the turnout
+void XoverMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
+{
+	// assume we are filtering repeated packets in the packet builder, so we don't check for that here
+	// assume DCCdecoder is set to return only packets for this decoder's address.
+
+	State dccState;
+	dccState = (Direction == 0) ? CURVED : STRAIGHT;
+	if (dccCommandSwap) dccState = (State)!dccState; // swap the interpretation of dcc command if needed
+
+													 // if we are already in the desired position, just exit
+	if (dccState == position) return;
+
+#ifdef _DEBUG
+	Serial.print("Received dcc command to position ");
+	Serial.println(dccState, DEC);
+#endif
+
+	// proceed only if both occupancy sensors are inactive (i.e., sensors override dcc command)
+	if (osAB.SwitchState() == HIGH && osCD.SwitchState() == HIGH)
+	{
+		// set switch state based on dcc command
+		position = dccState;
+		servoRate = LOW;
+		BeginServoMove();
+	}
+	else
+	{
+		// command error indication, normal led will resume after this timer expires
+		errorTimer.StartTimer(1000);
+		led.SetLED(RgbLed::YELLOW, RgbLed::FLASH);
+	}
+}
+
+
+// handle a DCC program on main command
+void XoverMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value)
+{
+	// do most of the program on main stuff in TurnoutBase
+	TurnoutBase::DCCPomHandler(Addr, instType, CV, Value);
+
+	// update servo vars from eeprom
+	if (CV == CV_servo1MinTravel) servo[0].SetExtent(LOW, dcc.GetCV(CV_servo1MinTravel));
+	if (CV == CV_servo1MaxTravel) servo[0].SetExtent(HIGH, dcc.GetCV(CV_servo1MaxTravel));
+	if (CV == CV_servoLowSpeed) servo[0].SetDuration(LOW, dcc.GetCV(CV_servoLowSpeed) * 100);
+	if (CV == CV_servoHighSpeed) servo[0].SetDuration(HIGH, dcc.GetCV(CV_servoHighSpeed) * 100);
+}
+
 
 
 

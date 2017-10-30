@@ -25,19 +25,26 @@ private:
 	void BeginServoMove();
 	void EndServoMove();
 
-	// helper functions for turnout states
-	State StateAC();
-	State StateBD();
-
 	// Sensors and outputs
 	const byte numServos = 4;
 	TurnoutServo servo[4] = { { Servo1Pin },{ Servo2Pin },{ Servo3Pin },{ Servo4Pin } };
-	Button osAB;            // occupancy sensor between switches A and B
-	Button osCD;            // occupancy sensor between switches C and D
-	OutputPin relayACstraight;
-	OutputPin relayACcurved;
-	OutputPin relayBDstraight;
-	OutputPin relayBDcurved;
+	OutputPin relay[4] = { { Relay1Pin }, {Relay2Pin}, {Relay3Pin},{Relay4Pin} };
+	Button osAB{ Sensor1Pin, true };            // occupancy sensor between switches A and B (servos 0 and 2)
+	Button osCD{ Sensor2Pin, true };            // occupancy sensor between switches C and D (servos 1 and 3)
+
+	// servo and relay state tables
+	const byte servoState[4][2] = {
+		{ 0, 1},
+		{ 0, 1 },
+		{ 0, 1 },
+		{ 0, 1 }
+	};
+	const byte relayState[4][2] = {
+		{ 1, 0 },
+		{ 0, 1 },
+		{ 1, 0 },
+		{ 0, 1 }
+	};
 
 	// event handlers
 	void ServoMoveDoneHandler();
