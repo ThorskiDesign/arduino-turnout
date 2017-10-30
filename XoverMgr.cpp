@@ -8,10 +8,6 @@
 
 // TurnoutMgr constructor
 XoverMgr::XoverMgr() :
-	servoA(Servo1Pin, ServoPowerPin),
-	servoB(Servo2Pin, ServoPowerPin),
-	servoC(Servo3Pin, ServoPowerPin),
-	servoD(Servo4Pin, ServoPowerPin),
 	osAB(Sensor1Pin, true),
 	osCD(Sensor2Pin, true),
 	relayACstraight(Relay1Pin),
@@ -27,10 +23,9 @@ XoverMgr::XoverMgr() :
 	osAB.SetButtonPressHandler(WrapperOSAB);
 	osCD.SetButtonPressHandler(WrapperOSCD);
 
-	// TODO: figure out how to handle servo poweron/off events
-	servoA.SetServoStartupHandler(WrapperServoStartup);
-	servoA.SetServoMoveDoneHandler(WrapperServoMoveDone);
-	servoA.SetServoPowerOffHandler(WrapperServoPowerOff);
+	// assign handler for servo move done events
+	for (byte i = 0; i < numServos; i++)
+		servo[i].SetServoMoveDoneHandler(WrapperServoMoveDone);
 
 	// configure dcc event handlers
 	dcc.SetBasicAccessoryDecoderPacketHandler(WrapperDCCAccPacket);
@@ -49,6 +44,7 @@ XoverMgr::XoverMgr() :
 	// configure timer event handlers
 	errorTimer.SetTimerHandler(WrapperErrorTimer);
 	resetTimer.SetTimerHandler(WrapperResetTimer);
+	servoTimer.SetTimerHandler(WrapperServoTimer);
 }
 
 
@@ -77,10 +73,10 @@ void XoverMgr::Update()
 	unsigned long currentMillis = millis();
 	osAB.Update(currentMillis);
 	osCD.Update(currentMillis);
-	servoA.Update(currentMillis);
-	servoB.Update(currentMillis);
-	servoC.Update(currentMillis);
-	servoD.Update(currentMillis);
+
+	if (servosActive)
+		for (byte i = 0; i < numServos; i++)
+			servo[i].Update(currentMillis);
 }
 
 
@@ -93,16 +89,13 @@ void XoverMgr::InitMain()
 	// servo setup - get extents, rates, and last position from cv's
 	byte lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
 	byte highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
-	servoA.Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, StateAC());
-	servoB.Initialize(dcc.GetCV(CV_servo2MinTravel), dcc.GetCV(CV_servo2MaxTravel), lowSpeed, highSpeed, StateBD());
-	servoC.Initialize(dcc.GetCV(CV_servo3MinTravel), dcc.GetCV(CV_servo3MaxTravel), lowSpeed, highSpeed, StateAC());
-	servoD.Initialize(dcc.GetCV(CV_servo4MinTravel), dcc.GetCV(CV_servo4MaxTravel), lowSpeed, highSpeed, StateBD());
+	servo[0].Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, StateAC());
+	servo[1].Initialize(dcc.GetCV(CV_servo2MinTravel), dcc.GetCV(CV_servo2MaxTravel), lowSpeed, highSpeed, StateBD());
+	servo[2].Initialize(dcc.GetCV(CV_servo3MinTravel), dcc.GetCV(CV_servo3MaxTravel), lowSpeed, highSpeed, StateAC());
+	servo[3].Initialize(dcc.GetCV(CV_servo4MinTravel), dcc.GetCV(CV_servo4MaxTravel), lowSpeed, highSpeed, StateBD());
 
-	// initlize led and relays
-	SetRelays();
-
-	// finally, kick off the bitstream capture
-	bitStream.Resume();
+	// set led and relays, and begin bitstream capture
+	EndServoMove();
 
 #ifdef _DEBUG
 	Serial.println("TurnoutMgr init done.");
@@ -111,36 +104,37 @@ void XoverMgr::InitMain()
 
 
 // set the led and relays for the current position
-void XoverMgr::SetRelays()
-{
-	State stateAC = StateAC();
-	State stateBD = StateBD();
+//void XoverMgr::SetRelays()
+//{
+//	State stateAC = StateAC();
+//	State stateBD = StateBD();
+//
+//	if (stateAC == STRAIGHT && stateBD == STRAIGHT)            // all turnouts straight
+//	{
+//		led.SetLED(RgbLed::GREEN, RgbLed::ON);
+//		relayACstraight.SetPin(HIGH);
+//		relayBDstraight.SetPin(HIGH);
+//	}
+//	if (stateAC == STRAIGHT && stateBD == CURVED)              // A and C straight, B and D curved
+//	{
+//		led.SetLED(RgbLed::CYAN, RgbLed::ON);
+//		relayACstraight.SetPin(HIGH);
+//		relayBDcurved.SetPin(HIGH);
+//	}
+//	if (stateAC == CURVED && stateBD == STRAIGHT)              // A and C curved, B and D straight
+//	{
+//		led.SetLED(RgbLed::MAGENTA, RgbLed::ON);
+//		relayACcurved.SetPin(HIGH);
+//		relayBDstraight.SetPin(HIGH);
+//	}
+//	if (stateAC == CURVED && stateBD == CURVED)                // all turnouts curved
+//	{
+//		led.SetLED(RgbLed::RED, RgbLed::ON);
+//		relayACcurved.SetPin(HIGH);
+//		relayBDcurved.SetPin(HIGH);
+//	}
+//}
 
-	if (stateAC == STRAIGHT && stateBD == STRAIGHT)            // all turnouts straight
-	{
-		led.SetLED(RgbLed::GREEN, RgbLed::ON);
-		relayACstraight.SetPin(HIGH);
-		relayBDstraight.SetPin(HIGH);
-	}
-	if (stateAC == STRAIGHT && stateBD == CURVED)              // A and C straight, B and D curved
-	{
-		led.SetLED(RgbLed::CYAN, RgbLed::ON);
-		relayACstraight.SetPin(HIGH);
-		relayBDcurved.SetPin(HIGH);
-	}
-	if (stateAC == CURVED && stateBD == STRAIGHT)              // A and C curved, B and D straight
-	{
-		led.SetLED(RgbLed::MAGENTA, RgbLed::ON);
-		relayACcurved.SetPin(HIGH);
-		relayBDstraight.SetPin(HIGH);
-	}
-	if (stateAC == CURVED && stateBD == CURVED)                // all turnouts curved
-	{
-		led.SetLED(RgbLed::RED, RgbLed::ON);
-		relayACcurved.SetPin(HIGH);
-		relayBDcurved.SetPin(HIGH);
-	}
-}
 
 TurnoutBase::State XoverMgr::StateAC()
 {
@@ -154,33 +148,98 @@ TurnoutBase::State XoverMgr::StateBD()
 
 
 // set the turnout to a new position (also disables relays prior to starting servo motion)
-void XoverMgr::SetServos(bool ServoRate)
+//void XoverMgr::SetServos(bool ServoRate)
+//{
+//	// turn off the relays
+//	relayACcurved.SetPin(LOW);
+//	relayACstraight.SetPin(LOW);
+//	relayBDcurved.SetPin(LOW);
+//	relayBDstraight.SetPin(LOW);
+//
+//	// set the servos
+//	State stateAC = StateAC();
+//	State stateBD = StateBD();
+//
+//	servoA.Set(stateAC, ServoRate);
+//	servoB.Set(stateBD, ServoRate);
+//	servoC.Set(stateAC, ServoRate);
+//	servoD.Set(stateBD, ServoRate);
+//
+//#ifdef _DEBUG
+//	Serial.print("Setting servos A/C to "); Serial.print(stateAC, DEC);
+//	Serial.print(",  Setting servos B/D to "); Serial.print(stateBD, DEC); 
+//	Serial.print(",  at rate "); Serial.println(ServoRate, DEC);
+//#endif
+//
+//	// TODO: how to store xover position?
+//	// store new position to cv
+//	dcc.SetCV(CV_turnoutPosition, position);
+//}
+
+
+// set the turnout to a new position
+void XoverMgr::BeginServoMove()
 {
-	// turn off the relays
-	relayACcurved.SetPin(LOW);
-	relayACstraight.SetPin(LOW);
-	relayBDcurved.SetPin(LOW);
-	relayBDstraight.SetPin(LOW);
-
-	// set the servos
-	State stateAC = StateAC();
-	State stateBD = StateBD();
-
-	servoA.Set(stateAC, ServoRate);
-	servoB.Set(stateBD, ServoRate);
-	servoC.Set(stateAC, ServoRate);
-	servoD.Set(stateBD, ServoRate);
-
-#ifdef _DEBUG
-	Serial.print("Setting servos A/C to "); Serial.print(stateAC, DEC);
-	Serial.print(",  Setting servos B/D to "); Serial.print(stateBD, DEC); 
-	Serial.print(",  at rate "); Serial.println(ServoRate, DEC);
-#endif
-
-	// TODO: how to store xover position?
 	// store new position to cv
 	dcc.SetCV(CV_turnoutPosition, position);
+
+	// configure the servo settings
+	for (byte i = 0; i < numServos; i++)
+		servoState[i] = position;
+
+	// set the led to indicate servo is in motion
+	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
+
+	// stop the bitstream capture
+	bitStream.Suspend();
+
+	// turn off the relays
+	relayStraight.SetPin(LOW);
+	relayCurved.SetPin(LOW);
+
+	// start pwm for current positions of all servos
+	for (byte i = 0; i < numServos; i++)
+		servo[i].StartPWM();
+
+	// turn on servo power
+	servoPower.SetPin(HIGH);
+
+	// set the servo index to the first servo and start moving the servos in sequence
+	servosActive = true;
+	currentServo = 0;
+	ServoMoveDoneHandler();
 }
+
+
+// resume normal operation after servo motion is complete
+void XoverMgr::EndServoMove()
+{
+	// set the led solid for the current position
+	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::ON);
+
+	// turn off servo power
+	servoPower.SetPin(LOW);
+
+	// stop pwm all servos
+	for (byte i = 0; i < numServos; i++)
+		servo[i].StopPWM();
+
+	// enable the appropriate relay, swapping if needed
+	if ((position == STRAIGHT && !relaySwap) || (position == CURVED && relaySwap))
+	{
+		relayStraight.SetPin(HIGH);
+	}
+
+	if ((position == CURVED && !relaySwap) || ((position == STRAIGHT) && relaySwap))
+	{
+		relayCurved.SetPin(HIGH);
+	}
+
+	// resume the bitstream capture
+	servosActive = false;
+	bitStream.Resume();
+}
+
 
 
 
@@ -189,27 +248,33 @@ void XoverMgr::SetServos(bool ServoRate)
 // Event Handlers
 
 
-// do things when the servo starts up
-void XoverMgr::ServoStartupHandler()
-{
-	bitStream.Suspend();  // suspend the bitstream to free up Timer1 for servo usage
-}
-
-// do things after the servo is powered off
-void XoverMgr::ServoPowerOffHandler()
-{
-	bitStream.Resume();   // resume the bitstream capture stopped prior to beginning servo motion
-}
-
-
 // do things after the servo finishes moving to its new position
 void XoverMgr::ServoMoveDoneHandler()
 {
-	SetRelays();          // set the relays for the new position
+	if (currentServo < numServos)
+	{
+#ifdef _DEBUG
+		Serial.print("Setting servo ");
+		Serial.print(currentServo, DEC);
+		Serial.print(" to ");
+		Serial.print(servoState[currentServo], DEC);
+		Serial.print(" at rate ");
+		Serial.println(servoRate, DEC);
+#endif
+
+		servo[currentServo].Set(servoState[currentServo], servoRate);
+		currentServo++;
+	}
+	else
+	{
+		int servoPowerOffDelay = 500;    // ms
+		servoTimer.StartTimer(servoPowerOffDelay);
+	}
 }
 
+
 // handle a button press
-void TurnoutMgr::ButtonEventHandler(bool ButtonState)
+void XoverMgr::ButtonEventHandler(bool ButtonState)
 {
 	// check button state (HIGH so we respond after button release)
 	if (ButtonState == HIGH)
@@ -219,8 +284,8 @@ void TurnoutMgr::ButtonEventHandler(bool ButtonState)
 		{
 			// toggle from current position and set new position
 			position = (State)!position;
-			led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
-			SetServo(LOW);
+			servoRate = LOW;
+			BeginServoMove();
 		}
 		else
 		{
@@ -233,12 +298,6 @@ void TurnoutMgr::ButtonEventHandler(bool ButtonState)
 
 
 
-
-
-
-
-
-
 // ========================================================================================================
 
 XoverMgr *XoverMgr::currentInstance = 0;    // pointer to allow us to access member objects from callbacks
@@ -247,9 +306,7 @@ XoverMgr *XoverMgr::currentInstance = 0;    // pointer to allow us to access mem
 void XoverMgr::WrapperButtonPress(bool ButtonState) { currentInstance->ButtonEventHandler(ButtonState); }
 void XoverMgr::WrapperOSAB(bool ButtonState) { currentInstance->OSABHandler(ButtonState); }
 void XoverMgr::WrapperOSCD(bool ButtonState) { currentInstance->OSCDHandler(ButtonState); }
-void XoverMgr::WrapperServoStartup() { currentInstance->ServoStartupHandler(); }
 void XoverMgr::WrapperServoMoveDone() { currentInstance->ServoMoveDoneHandler(); }
-void XoverMgr::WrapperServoPowerOff() { currentInstance->ServoPowerOffHandler(); }
 
 
 // ========================================================================================================
@@ -311,3 +368,4 @@ void XoverMgr::WrapperDCCPacketError(byte errorCode)
 // timer callback wrappers
 void XoverMgr::WrapperResetTimer() { currentInstance->ResetTimerHandler(); }
 void XoverMgr::WrapperErrorTimer() { currentInstance->ErrorTimerHandler(); }
+void XoverMgr::WrapperServoTimer() { currentInstance->EndServoMove(); }

@@ -4,9 +4,9 @@
 #define _XOVERMGR_h
 
 #if defined(ARDUINO) && ARDUINO >= 100
-	#include "Arduino.h"
+#include "Arduino.h"
 #else
-	#include "WProgram.h"
+#include "WProgram.h"
 #endif
 
 #include "TurnoutBase.h"
@@ -22,18 +22,16 @@ public:
 private:
 	// main functions
 	void InitMain();
-	void SetServos(bool ServoRate);
-	void SetRelays();
+	void BeginServoMove();
+	void EndServoMove();
 
 	// helper functions for turnout states
 	State StateAC();
 	State StateBD();
 
 	// Sensors and outputs
-	TurnoutServo servoA;
-	TurnoutServo servoB;
-	TurnoutServo servoC;
-	TurnoutServo servoD;
+	const byte numServos = 4;
+	TurnoutServo servo[4] = { { Servo1Pin },{ Servo2Pin },{ Servo3Pin },{ Servo4Pin } };
 	Button osAB;            // occupancy sensor between switches A and B
 	Button osCD;            // occupancy sensor between switches C and D
 	OutputPin relayACstraight;
@@ -42,9 +40,7 @@ private:
 	OutputPin relayBDcurved;
 
 	// event handlers
-	void ServoStartupHandler();
 	void ServoMoveDoneHandler();
-	void ServoPowerOffHandler();
 	void ButtonEventHandler(bool ButtonState);
 	void OSABHandler(bool ButtonState);
 	void OSCDHandler(bool ButtonState);
@@ -55,9 +51,7 @@ private:
 	static XoverMgr *currentInstance;
 
 	// Turnout manager event handler wrappers
-	static void WrapperServoStartup();
 	static void WrapperServoMoveDone();
-	static void WrapperServoPowerOff();
 	static void WrapperButtonPress(bool ButtonState);
 	static void WrapperOSAB(bool ButtonState);
 	static void WrapperOSCD(bool ButtonState);
@@ -79,6 +73,7 @@ private:
 	// Turnout manager event handler wrappers
 	static void WrapperResetTimer();
 	static void WrapperErrorTimer();
+	static void WrapperServoTimer();
 };
 
 #endif

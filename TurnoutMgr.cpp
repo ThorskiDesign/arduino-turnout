@@ -92,12 +92,9 @@ void TurnoutMgr::InitMain()
 	// do the init stuff in TurnoutBase
 	TurnoutBase::InitMain();    
 	
-	servo[0].Initialize(
-        dcc.GetCV(CV_servo1MinTravel),
-        dcc.GetCV(CV_servo1MaxTravel),
-        dcc.GetCV(CV_servoLowSpeed) * 100,
-        dcc.GetCV(CV_servoHighSpeed) * 100,
-        servoState);
+	byte lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
+	byte highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
+	servo[0].Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, servoState);
 
     // set led and relays, and begin bitstream capture
     EndServoMove();
