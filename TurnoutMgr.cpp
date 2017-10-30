@@ -7,11 +7,7 @@
 
 
 // TurnoutMgr constructor
-TurnoutMgr::TurnoutMgr():
-	osStraight(Sensor1Pin, true),
-	osCurved(Sensor2Pin, true),
-	relayStraight(Relay1Pin),
-	relayCurved(Relay2Pin) 
+TurnoutMgr::TurnoutMgr()
 {
 	// set pointer to this instance of the turnout manager, so that we can reference it in callbacks
 	currentInstance = this;
@@ -51,15 +47,15 @@ TurnoutMgr::TurnoutMgr():
 // Check for factory reset, then proceed with main initialization
 void TurnoutMgr::Initialize()
 {
-    // check for button hold on startup (for reset to defaults)
-    if (button.RawState() == LOW) 
-    {
-        FactoryReset(true);    // perform a complete reset
-    }
-    else
-    {
-        InitMain();
-    }
+	// check for button hold on startup (for reset to defaults)
+	if (button.RawState() == LOW)
+	{
+		FactoryReset(true);    // perform a complete reset
+	}
+	else
+	{
+		InitMain();
+	}
 }
 
 
@@ -90,14 +86,14 @@ void TurnoutMgr::Update()
 void TurnoutMgr::InitMain()
 {
 	// do the init stuff in TurnoutBase
-	TurnoutBase::InitMain();    
-	
+	TurnoutBase::InitMain();
+
 	byte lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
 	byte highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
-	servo[0].Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, servoState);
+	servo[0].Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, servoState[0][position]);
 
-    // set led and relays, and begin bitstream capture
-    EndServoMove();
+	// set led and relays, and begin bitstream capture
+	EndServoMove();
 
 #ifdef _DEBUG
 	Serial.println("TurnoutMgr init done.");
@@ -108,12 +104,8 @@ void TurnoutMgr::InitMain()
 // set the turnout to a new position
 void TurnoutMgr::BeginServoMove()
 {
-    // store new position to cv
-    dcc.SetCV(CV_turnoutPosition,position);
-
-	// configure the servo settings
-	for (byte i = 0; i < numServos; i++)
-		servoState[i] = position;
+	// store new position to cv
+	dcc.SetCV(CV_turnoutPosition, position);
 
 	// set the led to indicate servo is in motion
 	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
@@ -175,8 +167,8 @@ void TurnoutMgr::EndServoMove()
 
 
 // do things after the servo finishes moving to its new position
-void TurnoutMgr::ServoMoveDoneHandler() 
-{ 
+void TurnoutMgr::ServoMoveDoneHandler()
+{
 	if (currentServo < numServos)
 	{
 #ifdef _DEBUG
@@ -188,7 +180,7 @@ void TurnoutMgr::ServoMoveDoneHandler()
 		Serial.println(servoRate, DEC);
 #endif
 
-		servo[currentServo].Set(servoState[currentServo], servoRate);
+		servo[currentServo].Set(servoState[currentServo][position], servoRate);
 		currentServo++;
 	}
 	else
@@ -202,89 +194,89 @@ void TurnoutMgr::ServoMoveDoneHandler()
 // handle a button press
 void TurnoutMgr::ButtonEventHandler(bool ButtonState)
 {
-    // check button state (HIGH so we respond after button release)
-    if (ButtonState == HIGH)
-    {
-        // proceed only if both occupancy sensors are inactive (i.e., sensors override button press)
-        if (osStraight.SwitchState() == HIGH && osCurved.SwitchState() == HIGH)
-        {
-            // toggle from current position and set new position
-            position = (State) !position;
+	// check button state (HIGH so we respond after button release)
+	if (ButtonState == HIGH)
+	{
+		// proceed only if both occupancy sensors are inactive (i.e., sensors override button press)
+		if (osStraight.SwitchState() == HIGH && osCurved.SwitchState() == HIGH)
+		{
+			// toggle from current position and set new position
+			position = (State)!position;
 			servoRate = LOW;
-            BeginServoMove();
-        }
-        else
-        {
-            // button error indication, normal led will resume after this timer expires
-            errorTimer.StartTimer(1000);
-            led.SetLED(RgbLed::YELLOW, RgbLed::ON);
-        }
-    }
+			BeginServoMove();
+		}
+		else
+		{
+			// button error indication, normal led will resume after this timer expires
+			errorTimer.StartTimer(1000);
+			led.SetLED(RgbLed::YELLOW, RgbLed::ON);
+		}
+	}
 }
 
 
 // handle straight occupancy sensor signal
 void TurnoutMgr::OSStraightHandler(bool ButtonState)
 {
-    State newPos = (occupancySensorSwap) ? CURVED : STRAIGHT;
+	State newPos = (occupancySensorSwap) ? CURVED : STRAIGHT;
 
-    // check occupancy sensor state (LOW so we respond when train detected)
-    if (ButtonState == LOW && newPos != position)
-    {
-        position = newPos;
+	// check occupancy sensor state (LOW so we respond when train detected)
+	if (ButtonState == LOW && newPos != position)
+	{
+		position = newPos;
 		servoRate = HIGH;
-        BeginServoMove();
-    }
+		BeginServoMove();
+	}
 }
 
 
 // handle curved occupancy sensor signal
 void TurnoutMgr::OSCurvedHandler(bool ButtonState)
 {
-    State newPos = (occupancySensorSwap) ? STRAIGHT : CURVED;
+	State newPos = (occupancySensorSwap) ? STRAIGHT : CURVED;
 
-    // check occupancy sensor state (LOW so we respond when train detected)
-    if (ButtonState == LOW && newPos != position)
-    {
-        position = newPos;
+	// check occupancy sensor state (LOW so we respond when train detected)
+	if (ButtonState == LOW && newPos != position)
+	{
+		position = newPos;
 		servoRate = HIGH;
-        BeginServoMove();
-    }
+		BeginServoMove();
+	}
 }
 
 
 // handle a DCC basic accessory command, used for changing the state of the turnout
 void TurnoutMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
 {
-    // assume we are filtering repeated packets in the packet builder, so we don't check for that here
+	// assume we are filtering repeated packets in the packet builder, so we don't check for that here
 	// assume DCCdecoder is set to return only packets for this decoder's address.
 
-    State dccState;
-    dccState = (Direction == 0) ? CURVED : STRAIGHT;
-    if (dccCommandSwap) dccState = (State) !dccState; // swap the interpretation of dcc command if needed
+	State dccState;
+	dccState = (Direction == 0) ? CURVED : STRAIGHT;
+	if (dccCommandSwap) dccState = (State)!dccState; // swap the interpretation of dcc command if needed
 
-    // if we are already in the desired position, just exit
-    if (dccState == position) return;
+	// if we are already in the desired position, just exit
+	if (dccState == position) return;
 
 #ifdef _DEBUG
-    Serial.print("Received dcc command to position ");
-    Serial.println(dccState, DEC);
+	Serial.print("Received dcc command to position ");
+	Serial.println(dccState, DEC);
 #endif
 
-    // proceed only if both occupancy sensors are inactive (i.e., sensors override dcc command)
-    if (osStraight.SwitchState() == HIGH && osCurved.SwitchState() == HIGH)
-    {
-        // set switch state based on dcc command
-        position = dccState;
+	// proceed only if both occupancy sensors are inactive (i.e., sensors override dcc command)
+	if (osStraight.SwitchState() == HIGH && osCurved.SwitchState() == HIGH)
+	{
+		// set switch state based on dcc command
+		position = dccState;
 		servoRate = LOW;
-        BeginServoMove();
-    }
-    else
-    {
-        // command error indication, normal led will resume after this timer expires
-        errorTimer.StartTimer(1000);
-        led.SetLED(RgbLed::YELLOW, RgbLed::FLASH);
-    }
+		BeginServoMove();
+	}
+	else
+	{
+		// command error indication, normal led will resume after this timer expires
+		errorTimer.StartTimer(1000);
+		led.SetLED(RgbLed::YELLOW, RgbLed::FLASH);
+	}
 }
 
 

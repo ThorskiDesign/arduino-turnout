@@ -22,19 +22,19 @@ Example Usage:
 	TurnoutMgr TurnoutManager;          // create an instance of the turnout manager
 	TurnoutManager.Initialize();        // initialize the turnout manager. call this in setup().
 	TurnoutManager.Update();            // check for DCC commands, update sensors and actuators.
-	                                       call this in loop().
+										   call this in loop().
 
 Details:
 
 DCC command processing takes place as follows. The raw bitstream is captured by the BitStream
 object. When 32 bits have been captured, a callback to the packet decoder begins the assembly
-of the DCC packet. After the packet decoder has assembled and checksummed a complete packet, a 
-callback to the DCCdecoder initiates processing of the packet. Callbacks from the DCCdecoder 
-to the TurnoutMgr trigger actions for normal accessory decoder packets, extended accessory 
+of the DCC packet. After the packet decoder has assembled and checksummed a complete packet, a
+callback to the DCCdecoder initiates processing of the packet. Callbacks from the DCCdecoder
+to the TurnoutMgr trigger actions for normal accessory decoder packets, extended accessory
 decoder packets, and programming on main packets.
 
 The constructor initializer list configures the objects for managing the button, LED, servo, and
-various sensors and actuators. It also configures the BitStream and DCCpacket objects. The DCCpacket 
+various sensors and actuators. It also configures the BitStream and DCCpacket objects. The DCCpacket
 object is configured with checksum and filtering of repeat packets enabled.
 
 The InitMain method performs the major setup for the class, including setting up the DCC packet
@@ -63,7 +63,7 @@ aspects for turning the two auxilliary outputs on and off. The DCCPomHandler met
 program on main packet. It checks for a valid CV, stores the data via the DCCdecoder object, and
 then re-reads the basic configuration for the turnout.
 
-Event handler wrappers for the sensors, button, servo, timer, and DCC classes are static, so that 
+Event handler wrappers for the sensors, button, servo, timer, and DCC classes are static, so that
 they are accessible as callbacks from those classes. An instance variable provides access to the
 instance of the turnout manager, where the actual callback handling takes place.
 
@@ -89,7 +89,7 @@ public:
 	void Update();
 
 private:
-    // main functions
+	// main functions
 	void InitMain();
 	void BeginServoMove();
 	void EndServoMove();
@@ -97,10 +97,15 @@ private:
 	// Sensors and outputs
 	const byte numServos = 1;
 	TurnoutServo servo[1] = { {Servo1Pin} };
-	Button osStraight;
-	Button osCurved;
-	OutputPin relayStraight;
-	OutputPin relayCurved;
+	Button osStraight{ Sensor1Pin, true };
+	Button osCurved{ Sensor2Pin, true };
+	OutputPin relayStraight{ Relay1Pin };
+	OutputPin relayCurved{ Relay2Pin };
+
+	// servo and relay state tables
+	const byte servoState[1][2] = {
+		{ 0, 1 }
+	};
 
 	// event handlers
 	void ServoMoveDoneHandler();
