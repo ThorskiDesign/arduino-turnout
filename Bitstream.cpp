@@ -72,6 +72,13 @@ void BitStream::Resume()
 	//TCCR1B |= (1 << 1);   // set CS11 bit for 8 prescaler (0.5 us resolution, overflow every 32 ms)
 	TCCR1B |= (1 << 0);   // set CS10 bit for no prescaler (0.0625 us resolution, overflow every 4 ms)
 
+	// configure timer2
+	TCCR2A = 0;
+	TCCR2B = 0;
+	TCNT2 = 0;
+	TIMSK2 = 0;
+	TCCR2B |= (1 << 0); TCCR2B |= (1 << 1);  // set CS20 and CS21 bits for 32 prescaler (2.0 us resolution, overflow every 0.5 ms)
+											 
 	// input capture register configuration
 	TCCR1B |= (1 << 6);  // set input capture edge select bit for rising
 	TCCR1B |= (1 << 7);  // set input capture noise canceler
@@ -259,7 +266,7 @@ void BitStream::QueuePut(boolean newBit)
 void BitStream::GetIrqTimestamp()    // static
 {
 	// get the timer count before we do anything else
-	unsigned int count = TCNT1;
+	unsigned int count = TCNT2;
 
 	// timestamp assignment complete ~3 us after DCC state change
 

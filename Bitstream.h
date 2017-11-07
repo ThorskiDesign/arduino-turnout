@@ -95,10 +95,12 @@ other interrupts may affect the timing of this interrupt. The timing based on th
 #define DCC_DEFAULT_ZERO_MIN			90
 #define DCC_DEFAULT_ZERO_MAX			120    // 110 us for normal bit, 10000 us to allow zero-stretching
 
+#define CLOCK_SCALE_FACTOR				0.5F     // number of clock ticks per microsecond
+                                                 // 32 prescaler gives a 2.0 us interval
 //#define CLOCK_SCALE_FACTOR				2U       // number of clock ticks per microsecond
 //                                                 // 8 prescaler gives a 0.5 us interval
-#define CLOCK_SCALE_FACTOR				16U      // number of clock ticks per microsecond
-												 // no prescaler gives a 0.0625 us interval
+//#define CLOCK_SCALE_FACTOR				16U      // number of clock ticks per microsecond
+//												 // no prescaler gives a 0.0625 us interval
 
 
 class BitStream
@@ -139,12 +141,14 @@ private:
 	void StateNormal();
 	void HandleError();
 
+	// declare these as byte for 8 bit timers, unsigned int for 16 bit timers
+	byte currentCount = 0;          // timer count for the last pulse
+	byte period = 0;                // period of the current pulse
+	byte lastInterruptCount = 0;    // Timer1 count at the last interrupt
+
 	// bitstream capture vars
-	unsigned int currentCount = 0;          // timer count for the last pulse
-	unsigned int period = 0;                // period of the current pulse
 	boolean isOne = false;                  // pulse is within the limits for a 1
 	boolean isZero = false;                 // pulse is within the limits for a 0
-	unsigned int lastInterruptCount = 0;    // Timer1 count at the last interrupt
 	boolean lastHalfBit = 0;                // the last half bit captured
 	boolean endOfBit = false;               // second half-bit indicator
 
