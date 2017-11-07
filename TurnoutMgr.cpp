@@ -322,7 +322,7 @@ void TurnoutMgr::ServoMoveDoneHandler()
 	}
 	else
 	{
-		byte servoPowerOffDelay = 500;    // ms
+		int servoPowerOffDelay = 500;    // ms
 		servoTimer.StartTimer(servoPowerOffDelay);
 	}
 }
