@@ -81,8 +81,8 @@ void XoverMgr::InitMain()
 	TurnoutBase::InitMain();
 
 	// servo setup - get extents, rates, and last position from cv's
-	byte lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
-	byte highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
+	int lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
+	int highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
 	servo[0].Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, servoState[0][position]);
 	servo[1].Initialize(dcc.GetCV(CV_servo2MinTravel), dcc.GetCV(CV_servo2MaxTravel), lowSpeed, highSpeed, servoState[1][position]);
 	servo[2].Initialize(dcc.GetCV(CV_servo3MinTravel), dcc.GetCV(CV_servo3MaxTravel), lowSpeed, highSpeed, servoState[2][position]);
@@ -166,7 +166,7 @@ void XoverMgr::ServoMoveDoneHandler()
 		Serial.print("Setting servo ");
 		Serial.print(currentServo, DEC);
 		Serial.print(" to ");
-		Serial.print(servoState[currentServo], DEC);
+		Serial.print(servoState[currentServo][position], DEC);
 		Serial.print(" at rate ");
 		Serial.println(servoRate, DEC);
 #endif

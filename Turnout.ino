@@ -5,7 +5,7 @@
 #include "XoverMgr.h"
 
 
-XoverMgr TurnoutManager;
+TurnoutMgr TurnoutManager;
 
 
 void setup()

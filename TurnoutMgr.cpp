@@ -16,7 +16,6 @@ TurnoutMgr::TurnoutMgr()
 	button.SetButtonPressHandler(WrapperButtonPress);
 	osStraight.SetButtonPressHandler(WrapperOSStraight);
 	osCurved.SetButtonPressHandler(WrapperOSCurved);
-	servo[0].SetServoMoveDoneHandler(WrapperServoMoveDone);
 
 	// configure dcc event handlers
 	dcc.SetBasicAccessoryDecoderPacketHandler(WrapperDCCAccPacket);
@@ -88,8 +87,8 @@ void TurnoutMgr::InitMain()
 	// do the init stuff in TurnoutBase
 	TurnoutBase::InitMain();
 
-	byte lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
-	byte highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
+	int lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
+	int highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
 	servo[0].Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, servoState[0][position]);
 
 	// set led and relays, and begin bitstream capture
@@ -175,7 +174,7 @@ void TurnoutMgr::ServoMoveDoneHandler()
 		Serial.print("Setting servo ");
 		Serial.print(currentServo, DEC);
 		Serial.print(" to ");
-		Serial.print(servoState[currentServo], DEC);
+		Serial.print(servoState[currentServo][position], DEC);
 		Serial.print(" at rate ");
 		Serial.println(servoRate, DEC);
 #endif
