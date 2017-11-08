@@ -27,12 +27,13 @@ protected:
 	// Hardware assignments
 	const byte Aux1Pin = 0;
 	const byte Aux2Pin = 1;
+	const byte HWirqPin = 2;
 	const byte ButtonPin = 3;
 	const byte ServoPowerPin = 4;
 	const byte Servo1Pin = 5;
 	const byte LedBPin = 6;
 	const byte LedRPin = 7;
-	const byte DCCPin = 8;
+	const byte ICRPin = 8;
 	const byte Servo2Pin = 9;
 	const byte Servo3Pin = 10;
 	const byte Servo4Pin = 11;
