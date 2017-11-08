@@ -4,26 +4,13 @@
 // set up the packet builder
 DCCpacket::DCCpacket()
 {
-    dataBits = 0;
-    state = READPREAMBLE;         // current processing state
-    packetIndex = 0;              // packet byte that we're on
-    packetMask = 0x80;            // mask for assigning bits to packet bytes
-    preambleBitCount = 0;         // count of consecutive 1's we've found while looking for preamble
-
     packetLog[0].packetSize = 0;  // initialize packet history
     packetLog[0].packetTime = 0;
-
-    enableChecksum = true;        // require valid checksum in order to return packet
-    filterRepeatPackets = true;   // filter out repeated packets, sending only the first in the given interval
-    filterInterval = 250;         // time period (ms) within which packets are considered repeats
-
-    packetCompleteHandler = 0;    // pointers to callback functions
-    packetErrorHandler = 0;
 }
 
 
 // set up the packet builder with specified checksum and filter settings
-DCCpacket::DCCpacket(boolean EnableChecksum, boolean FilterRepeats, unsigned int FilterInterval) : DCCpacket()
+DCCpacket::DCCpacket(bool EnableChecksum, bool FilterRepeats, unsigned int FilterInterval) : DCCpacket()
 {
     enableChecksum = EnableChecksum;         // require valid checksum in order to return packet
     filterRepeatPackets = FilterRepeats;     // filter out repeated packets, sending only the first in the given interval
@@ -43,13 +30,13 @@ void DCCpacket::SetPacketErrorHandler(PacketErrorHandler Handler)
 }
 
 
-void DCCpacket::EnableChecksum(boolean Enable)
+void DCCpacket::EnableChecksum(bool Enable)
 {
     enableChecksum = Enable;
 }
 
 
-void DCCpacket::FilterRepeatPackets(boolean Filter)
+void DCCpacket::FilterRepeatPackets(bool Filter)
 {
     filterRepeatPackets = Filter;
 }
@@ -160,7 +147,7 @@ void DCCpacket::ReadPacket()
 void DCCpacket::Execute()
 {
     // initialize as true so we can just skip checksum if disabled
-    boolean checksumOk = true;
+    bool checksumOk = true;
 
     // verify checksum if enabled
     if (enableChecksum)
@@ -209,11 +196,11 @@ void DCCpacket::Reset()
 // check for repeat packets within a certain time interval. returns true if a match is found.
 // updating of the packet history removes packets that are outside the time interval, and ensures that
 // the most common packets are at the front of the list
-boolean DCCpacket::IsRepeatPacket()
+bool DCCpacket::IsRepeatPacket()
 {
     // 30-60 us to process this function
 
-    unsigned long currentMillis = millis();
+    const unsigned long currentMillis = millis();
 
     // remove packets that have timed out and compact history
     byte newEntryCount = 0;
@@ -241,7 +228,7 @@ boolean DCCpacket::IsRepeatPacket()
         if (packetLog[newEntryCount].packetSize == packetIndex + 1)    // check size first, that's quick and easy
         {
             // now check each byte in turn
-            boolean matchFound = true;
+            bool matchFound = true;
             for (int i=0; i < packetIndex + 1; i++)
                 if (packetLog[newEntryCount].packetData[i] != packet[i])
                     matchFound = false;
