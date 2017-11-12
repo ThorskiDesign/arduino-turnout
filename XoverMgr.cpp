@@ -259,8 +259,22 @@ void XoverMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, 
 	// update servo vars from eeprom
 	if (CV == CV_servo1MinTravel) servo[0].SetExtent(LOW, dcc.GetCV(CV_servo1MinTravel));
 	if (CV == CV_servo1MaxTravel) servo[0].SetExtent(HIGH, dcc.GetCV(CV_servo1MaxTravel));
-	if (CV == CV_servoLowSpeed) servo[0].SetDuration(LOW, dcc.GetCV(CV_servoLowSpeed) * 100);
-	if (CV == CV_servoHighSpeed) servo[0].SetDuration(HIGH, dcc.GetCV(CV_servoHighSpeed) * 100);
+
+	if (CV == CV_servo2MinTravel) servo[1].SetExtent(LOW, dcc.GetCV(CV_servo2MinTravel));
+	if (CV == CV_servo2MaxTravel) servo[1].SetExtent(HIGH, dcc.GetCV(CV_servo2MaxTravel));
+
+	if (CV == CV_servo3MinTravel) servo[2].SetExtent(LOW, dcc.GetCV(CV_servo3MinTravel));
+	if (CV == CV_servo3MaxTravel) servo[2].SetExtent(HIGH, dcc.GetCV(CV_servo3MaxTravel));
+
+	if (CV == CV_servo4MinTravel) servo[3].SetExtent(LOW, dcc.GetCV(CV_servo4MinTravel));
+	if (CV == CV_servo4MaxTravel) servo[3].SetExtent(HIGH, dcc.GetCV(CV_servo4MaxTravel));
+	
+	if (CV == CV_servoLowSpeed)
+		for (byte i = 0; i < numServos; i++)
+			servo[i].SetDuration(LOW, dcc.GetCV(CV_servoLowSpeed) * 100);
+	if (CV == CV_servoHighSpeed)
+		for (byte i = 0; i < numServos; i++)
+			servo[i].SetDuration(HIGH, dcc.GetCV(CV_servoHighSpeed) * 100);
 }
 
 
