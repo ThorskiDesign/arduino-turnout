@@ -93,7 +93,7 @@ other interrupts may affect the timing of this interrupt. The timing based on th
 #define DCC_DEFAULT_ONE_MIN				52
 #define DCC_DEFAULT_ONE_MAX				64
 #define DCC_DEFAULT_ZERO_MIN			90
-#define DCC_DEFAULT_ZERO_MAX			120    // 110 us for normal bit, 10000 us to allow zero-stretching
+#define DCC_DEFAULT_ZERO_MAX			110    // 110 us for normal bit, 10000 us to allow zero-stretching
 
 #define CLOCK_SCALE_FACTOR				0.5F     // number of clock ticks per microsecond
                                                  // 32 prescaler gives a 2.0 us interval
