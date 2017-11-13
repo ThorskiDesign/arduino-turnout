@@ -97,7 +97,7 @@ public:
 
 private:
     // Hardware assignments
-	const byte DCCPin = 8;
+	const byte DCCPin = 2;
 	const byte ButtonPin = 3;
 	const byte ServoPowerPin = 4;
 	const byte ServoPWMPin = 5;
@@ -154,7 +154,7 @@ private:
 	bool dccCommandSwap = false;               // optionally swap the meaning of received dcc commands
 	bool relaySwap = false;					   // optionally swap the straight/curved relays
 	bool factoryReset = false;                 // is a reset in progress
-	bool showErrorIndication = true;           // enable or disable LED error indications
+	bool showErrorIndication = false;           // enable or disable LED error indications
 	bool servosActive = false;                 // flag to indicate if servos are active or not
 	byte currentServo = 0;                     // the servo that is currently in motion
 	State servoState[1] = { {STRAIGHT} };      // state that each servo will be set to
