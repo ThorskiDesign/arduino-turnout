@@ -78,7 +78,10 @@ class TurnoutServo : public Servo
 	void SetServoMoveDoneHandler(ServoEventHandler Handler);
 
 private:
-	enum ServoState { OFF, STARTING, MOVING, STOPPING };
+	enum ServoState { 
+		OFF,        // pwm is off and servo is detached
+		READY,      // pwm is on, servo is ready to move
+		MOVING };   // servo motion is in progress
 
     void ComputeSteps();
 	void MoveTo(bool Position, bool Rate);

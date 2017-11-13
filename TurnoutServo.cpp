@@ -60,7 +60,7 @@ void TurnoutServo::Update(unsigned long CurrentMillis)
             else
             {
                 currentStep = 0;           // reset counter for next movement
-                servoState = STOPPING;     // advance to next state
+                servoState = READY;        // move is done, set back to ready state
                 if (servoMoveDoneHandler) servoMoveDoneHandler();    // raise event indicating servo motion is complete
             }
         }
@@ -117,8 +117,7 @@ void TurnoutServo::SetExtent(bool Position, byte Extent)
 // configure and start up servo motion
 void TurnoutServo::MoveTo(bool Position, bool Rate)
 {
-	// exit if not powered on already
-	if (servoState != STARTING) return;
+	if (servoState != READY) return;   // only go to the moving state from the ready state
 
 	// update position and rate settings
 	positionSet = Position;
@@ -129,15 +128,19 @@ void TurnoutServo::MoveTo(bool Position, bool Rate)
 
 void TurnoutServo::StartPWM()
 {
+	if (servoState != OFF) return;   // only go to the ready state from the off state or at the end of a move
+
 	// ensure we are sending pulses for the current position
-	attach(servoPin);
 	write(extent[positionSet]);
-	servoState = STARTING;
+	attach(servoPin);
+	servoState = READY;
 }
 
 
 void TurnoutServo::StopPWM()
 {
+	if (servoState != READY) return;   // only go to the off state from the ready state
+
 	detach();                            // stop sending pwm pulses
 	digitalWrite(servoPin, LOW);         // force servo pin low
 	servoState = OFF;
