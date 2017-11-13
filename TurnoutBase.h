@@ -12,7 +12,6 @@
 #include "Bitstream.h"
 #include "DCCpacket.h"
 #include "DCCdecoder.h"
-#include "TurnoutServo.h"
 #include "RGB_LED.h"
 #include "Button.h"
 #include "OutputPin.h"
@@ -80,7 +79,7 @@ protected:
 	bool dccCommandSwap = false;               // optionally swap the meaning of received dcc commands
 	bool relaySwap = false;					   // optionally swap the straight/curved relays
 	bool factoryReset = false;                 // is a reset in progress
-	bool showErrorIndication = true;           // enable or disable LED error indications
+	bool showErrorIndication = false;           // enable or disable LED error indications
 	bool servosActive = false;                 // flag to indicate if servos are active or not
 	byte currentServo = 0;                     // the servo that is currently in motion
 	bool servoRate = LOW;                      // rate at which the servos will be set

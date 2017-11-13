@@ -79,6 +79,7 @@ instance of the turnout manager, where the actual callback handling takes place.
 #endif
 
 #include "TurnoutBase.h"
+#include "TurnoutServo.h"
 
 
 class TurnoutMgr : protected TurnoutBase

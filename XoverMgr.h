@@ -10,6 +10,7 @@
 #endif
 
 #include "TurnoutBase.h"
+#include "TurnoutServo.h"
 
 
 class XoverMgr : protected TurnoutBase
