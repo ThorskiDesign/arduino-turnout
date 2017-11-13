@@ -76,12 +76,12 @@ public:
     typedef void (*PacketErrorHandler)(byte ErrorCode);
 
     DCCpacket();
-    DCCpacket(boolean EnableChecksum, boolean FilterRepeats, unsigned int FilterInterval);
+    DCCpacket(bool EnableChecksum, bool FilterRepeats, unsigned int FilterInterval);
     void ProcessIncomingBits(unsigned long incomingBits);
     void SetPacketCompleteHandler(PacketCompleteHandler Handler);
     void SetPacketErrorHandler(PacketErrorHandler Handler);
-    void EnableChecksum(boolean Enable);
-    void FilterRepeatPackets(boolean Filter);
+    void EnableChecksum(bool Enable);
+    void FilterRepeatPackets(bool Filter);
 
 private:
     // states
@@ -103,25 +103,25 @@ private:
     void ReadPacket();
     void Execute();
     void Reset();
-    boolean IsRepeatPacket();
+	bool IsRepeatPacket();
 
     // callback handlers
-    PacketCompleteHandler packetCompleteHandler;
-    PacketErrorHandler packetErrorHandler;
+    PacketCompleteHandler packetCompleteHandler = 0;
+    PacketErrorHandler packetErrorHandler = 0;
 
     // state and packet vars
-    unsigned long dataBits;        // the source bit data
-    State state;                   // current processing state
-    byte packetIndex;              // packet byte that we're on
-    byte packetMask;               // mask for assigning bits to packet bytes
-    byte packet[PACKET_LEN_MAX + 1];   // packet data
-    boolean currentBit;               // the current bit extracted from the input stream
-    byte preambleBitCount;         // count of consecutive 1's we've found while looking for preamble
+    unsigned long dataBits = 0;         // the source bit data
+    State state = READPREAMBLE;         // current processing state
+    byte packetIndex = 0;               // packet byte that we're on
+    byte packetMask = 0x80;             // mask for assigning bits to packet bytes
+    byte packet[PACKET_LEN_MAX + 1];    // packet data
+	bool currentBit = 0;                // the current bit extracted from the input stream
+    byte preambleBitCount = 0;          // count of consecutive 1's we've found while looking for preamble
 
-    boolean enableChecksum;        // require valid checksum in order to return packet
-    boolean filterRepeatPackets;   // filter out repeated packets, sending only the first in the given interval
-    unsigned int filterInterval;   // time period (ms) within which packets are considered repeats
-    LogPacket packetLog[MAX_PACKET_LOG_SIZE];   // history of packets to check for repeats
+    bool enableChecksum = true;                // require valid checksum in order to return packet
+    bool filterRepeatPackets = true;           // filter out repeated packets, sending only the first in the given interval
+    unsigned int filterInterval = 250;         // time period (ms) within which packets are considered repeats
+	LogPacket packetLog[MAX_PACKET_LOG_SIZE];  // history of packets to check for repeats
 };
 
 
