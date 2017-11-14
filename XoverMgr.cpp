@@ -134,11 +134,11 @@ void XoverMgr::EndServoMove()
 	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::ON);
 
 	// turn off servo power
-	servoPower.SetPin(LOW);
+	//servoPower.SetPin(LOW);
 
 	// stop pwm all servos
-	for (byte i = 0; i < numServos; i++)
-		servo[i].StopPWM();
+	//for (byte i = 0; i < numServos; i++)
+	//	servo[i].StopPWM();
 
 	// enable the appropriate relay
 	for (byte i = 0; i < numServos; i++)
