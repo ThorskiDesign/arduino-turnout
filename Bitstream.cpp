@@ -53,7 +53,7 @@ void BitStream::Suspend()
 	noInterrupts();
 	stateFunctionPointer = 0;
 	detachInterrupt(digitalPinToInterrupt(interruptPin));   // disable the h/w interrupt
-	TIMSK1 = 0;                                             // disable input capture interrupt
+	//TIMSK1 = 0;                                             // disable input capture interrupt
 	interrupts();
 }
 
@@ -64,13 +64,13 @@ void BitStream::Resume()
 	noInterrupts();
 
 	// Configure timer1 for use in getting interrupt timing.
-	TCCR1A = 0;    // reset the registers initially
-	TCCR1B = 0;
-	TCCR1C = 0;
-	TCNT1 = 0;
-	TIMSK1 = 0;
-	//TCCR1B |= (1 << 1);   // set CS11 bit for 8 prescaler (0.5 us resolution, overflow every 32 ms)
-	TCCR1B |= (1 << 0);   // set CS10 bit for no prescaler (0.0625 us resolution, overflow every 4 ms)
+	//TCCR1A = 0;    // reset the registers initially
+	//TCCR1B = 0;
+	//TCCR1C = 0;
+	//TCNT1 = 0;
+	//TIMSK1 = 0;
+	////TCCR1B |= (1 << 1);   // set CS11 bit for 8 prescaler (0.5 us resolution, overflow every 32 ms)
+	//TCCR1B |= (1 << 0);   // set CS10 bit for no prescaler (0.0625 us resolution, overflow every 4 ms)
 
 	// configure timer2
 	TCCR2A = 0;
@@ -80,8 +80,8 @@ void BitStream::Resume()
 	TCCR2B |= (1 << 0); TCCR2B |= (1 << 1);  // set CS20 and CS21 bits for 32 prescaler (2.0 us resolution, overflow every 0.5 ms)
 											 
 	// input capture register configuration
-	TCCR1B |= (1 << 6);  // set input capture edge select bit for rising
-	TCCR1B |= (1 << 7);  // set input capture noise canceler
+	//TCCR1B |= (1 << 6);  // set input capture edge select bit for rising
+	//TCCR1B |= (1 << 7);  // set input capture noise canceler
 
 	// initialize the outgoing queue
 	queueSize = 0;
@@ -94,7 +94,7 @@ void BitStream::Resume()
 	// set starting time and configure interrupt
 	if (useICR)
 	{
-		TIMSK1 |= (1 << 5);  // enable input capture interrupt
+		//TIMSK1 |= (1 << 5);  // enable input capture interrupt
 	}
 	else
 	{
