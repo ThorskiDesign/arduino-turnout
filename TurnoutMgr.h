@@ -22,19 +22,19 @@ Example Usage:
 	TurnoutMgr TurnoutManager;          // create an instance of the turnout manager
 	TurnoutManager.Initialize();        // initialize the turnout manager. call this in setup().
 	TurnoutManager.Update();            // check for DCC commands, update sensors and actuators.
-	                                       call this in loop().
+										   call this in loop().
 
 Details:
 
 DCC command processing takes place as follows. The raw bitstream is captured by the BitStream
 object. When 32 bits have been captured, a callback to the packet decoder begins the assembly
-of the DCC packet. After the packet decoder has assembled and checksummed a complete packet, a 
-callback to the DCCdecoder initiates processing of the packet. Callbacks from the DCCdecoder 
-to the TurnoutMgr trigger actions for normal accessory decoder packets, extended accessory 
+of the DCC packet. After the packet decoder has assembled and checksummed a complete packet, a
+callback to the DCCdecoder initiates processing of the packet. Callbacks from the DCCdecoder
+to the TurnoutMgr trigger actions for normal accessory decoder packets, extended accessory
 decoder packets, and programming on main packets.
 
 The constructor initializer list configures the objects for managing the button, LED, servo, and
-various sensors and actuators. It also configures the BitStream and DCCpacket objects. The DCCpacket 
+various sensors and actuators. It also configures the BitStream and DCCpacket objects. The DCCpacket
 object is configured with checksum and filtering of repeat packets enabled.
 
 The InitMain method performs the major setup for the class, including setting up the DCC packet
@@ -63,7 +63,7 @@ aspects for turning the two auxilliary outputs on and off. The DCCPomHandler met
 program on main packet. It checks for a valid CV, stores the data via the DCCdecoder object, and
 then re-reads the basic configuration for the turnout.
 
-Event handler wrappers for the sensors, button, servo, timer, and DCC classes are static, so that 
+Event handler wrappers for the sensors, button, servo, timer, and DCC classes are static, so that
 they are accessible as callbacks from those classes. An instance variable provides access to the
 instance of the turnout manager, where the actual callback handling takes place.
 
@@ -78,17 +78,11 @@ instance of the turnout manager, where the actual callback handling takes place.
 #include "WProgram.h"
 #endif
 
-#include "Bitstream.h"
-#include "DCCpacket.h"
-#include "DCCdecoder.h"
+#include "TurnoutBase.h"
 #include "TurnoutServo.h"
-#include "RGB_LED.h"
-#include "Button.h"
-#include "OutputPin.h"
-#include "EventTimer.h"
 
 
-class TurnoutMgr
+class TurnoutMgr : protected TurnoutBase
 {
 public:
 	TurnoutMgr();
@@ -96,157 +90,59 @@ public:
 	void Update();
 
 private:
-    // Hardware assignments
-	const byte DCCPin = 2;
-	const byte ButtonPin = 3;
-	const byte ServoPowerPin = 4;
-	const byte ServoPWMPin = 5;
-	const byte LedPinR = 7;
-	const byte LedPinG = 12;
-	const byte LedPinB = 6;
-	const byte RelayStraightPin = 14;
-	const byte RelayCurvedPin = 15;
-	const byte OSstraightPin = 16;
-	const byte OScurvedPin = 17;
-	const byte Aux1Pin = 0;
-	const byte Aux2Pin = 1;
-
-    // main functions
+	// main functions
 	void InitMain();
-	void FactoryReset(bool HardReset);
 	void BeginServoMove();
 	void EndServoMove();
 
 	// Sensors and outputs
-	Button button;
-	Button osStraight;
-	Button osCurved;
-	RgbLed led;
 	const byte numServos = 1;
-	TurnoutServo servo[1] = { {ServoPWMPin} };
-	OutputPin servoPower;
-	OutputPin relayStraight;
-	OutputPin relayCurved;
-	OutputPin auxOutput1;
-	OutputPin auxOutput2;
-	EventTimer resetTimer;
-	EventTimer errorTimer;
-	EventTimer servoTimer;
+	TurnoutServo servo[1] = { {Servo1Pin} };
+	Button osStraight{ Sensor1Pin, true };
+	Button osCurved{ Sensor2Pin, true };
+	OutputPin relayStraight{ Relay1Pin };
+	OutputPin relayCurved{ Relay2Pin };
 
-	// DCC bitstream and packet processors
-    BitStream bitStream;
-    DCCpacket dccPacket;
-    DCCdecoder dcc;
-
-    // bitstream and packet builder related
-    unsigned long bitErrorCount = 0;
-    unsigned long packetErrorCount = 0;
-	const byte maxBitErrors = 10;         // number of bit errors before indication
-    const byte maxPacketErrors = 10;      // number of packet errors before bitstream reset
-    unsigned long lastMillis = 0;         // for tracking refresh interval for error counts
-
-    // other instance variables
-    enum State { STRAIGHT, CURVED };
-	byte dccAddress = 1;                       // the dcc address of the decoder
-	State position = STRAIGHT;                 // the current or commanded position of the switch
-	bool servoEndPointSwap = false;            // optionally swap the low/high servo endpoints
-	bool occupancySensorSwap = false;          // optionally swap the straight/curved occupancy sensors
-	bool dccCommandSwap = false;               // optionally swap the meaning of received dcc commands
-	bool relaySwap = false;					   // optionally swap the straight/curved relays
-	bool factoryReset = false;                 // is a reset in progress
-	bool showErrorIndication = false;           // enable or disable LED error indications
-	bool servosActive = false;                 // flag to indicate if servos are active or not
-	byte currentServo = 0;                     // the servo that is currently in motion
-	State servoState[1] = { {STRAIGHT} };      // state that each servo will be set to
-	bool servoRate = LOW;                      // rate at which the servos will be set
-
-	// define our available cv's  (allowable range 33-81 per 9.2.2)
-	const byte CV_AddressLSB = 1;
-	const byte CV_AddressMSB = 9;
-	const byte CV_servoMinTravel = 33;
-	const byte CV_servoMaxTravel = 34;
-	const byte CV_servoLowSpeed = 35;
-	const byte CV_servoHighSpeed = 36;
-	const byte CV_servoEndPointSwap = 37;
-	const byte CV_occupancySensorSwap = 38;
-	const byte CV_dccCommandSwap = 39;
-	const byte CV_relaySwap = 40;
-	const byte CV_Aux1Off = 41;
-	const byte CV_Aux1On = 42;
-	const byte CV_Aux2Off = 43;
-	const byte CV_Aux2On = 44;
-	const byte CV_positionIndicationToggle = 45;
-	const byte CV_errorIndicationToggle = 46;
-	const byte CV_turnoutPosition = 50;
-
-	// set up default cv's
-	struct CVPair
-	{
-		uint16_t  CV;
-		uint8_t   Value;
-		bool      SoftReset;
-	};
-
-	// factory default settings
-	const byte CV_reset = 55;
-	const byte CV_softResetValue = 11;
-	const byte CV_hardResetValue = 55;
-
-	CVPair FactoryDefaultCVs [17] =
-	{
-		{CV_AddressLSB, 1, false},
-		{CV_AddressMSB, 0, false},
-		{CV_servoMinTravel, 90, false},
-		{CV_servoMaxTravel, 90, false},
-		{CV_servoLowSpeed, 25, true},
-		{CV_servoHighSpeed, 0, true},
-		{CV_servoEndPointSwap, 0, true},
-		{CV_occupancySensorSwap, 0, true},
-		{CV_dccCommandSwap, 0, true},
-		{CV_relaySwap, 0, true},
-		{CV_Aux1Off, 10, true },
-		{CV_Aux1On, 11, true },
-		{CV_Aux2Off, 20, true },
-		{CV_Aux2On, 21, true },
-		{CV_positionIndicationToggle, 1, true},
-		{CV_errorIndicationToggle, 2, true},
-		{CV_turnoutPosition, 0, false}
+	// servo and relay state tables
+	const byte servoState[1][2] = {
+		{ 0, 1 }
 	};
 
 	// event handlers
-	void DCCAccCommandHandler(unsigned int Addr, unsigned int Direction);
-	void DCCExtCommandHandler(unsigned int Addr, unsigned int Data);
-	void DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value);
-	void ButtonEventHandler(bool ButtonState);
 	void ServoMoveDoneHandler();
-	void ResetTimerHandler();
-	void ErrorTimerHandler();
+	void ButtonEventHandler(bool ButtonState);
 	void OSStraightHandler(bool ButtonState);
 	void OSCurvedHandler(bool ButtonState);
+	void DCCAccCommandHandler(unsigned int Addr, unsigned int Direction);
+	void DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value);
 
-    // pointer to allow us to access member objects from callbacks
-    static TurnoutMgr* currentInstance;           
+	// pointer to allow us to access member objects from callbacks
+	static TurnoutMgr *currentInstance;
 
-    // callbacks for bitstream and packet builder
-    static void WrapperBitStream(unsigned long incomingBits);
-    static void WrapperBitStreamError(byte errorCode);
-    static void WrapperDCCPacket(byte *packetData, byte size);
-    static void WrapperDCCPacketError(byte errorCode);
-    
-    // Turnout manager event handler wrappers
-    static void WrapperButtonPress(bool ButtonState);
-    static void WrapperServoMoveDone();
-    static void WrapperResetTimer();
-    static void WrapperErrorTimer();
-    static void WrapperOSStraight(bool ButtonState);
-    static void WrapperOSCurved(bool ButtonState);
-	static void WrapperServoTimer();
+	// Turnout manager event handler wrappers
+	static void WrapperButtonPress(bool ButtonState);
+	static void WrapperOSStraight(bool ButtonState);
+	static void WrapperOSCurved(bool ButtonState);
+	static void WrapperServoMoveDone();
 
-    // DCC event handler wrappers in main
-    static void WrapperDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte data);
+	// DCC event handler wrappers
+	static void WrapperDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte data);
 	static void WrapperDCCExtPacket(int boardAddress, int outputAddress, byte data);
-    static void WrapperDCCAccPomPacket(int boardAddress,int outputAddress, byte instructionType, int cv, byte data);
-    static void WrapperDCCDecodingError(byte errorCode);
+	static void WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byte instructionType, int cv, byte data);
+	static void WrapperDCCDecodingError(byte errorCode);
+
+	// wrappers for callbacks in TurnoutBase ================================================================
+
+	// callbacks for bitstream and packet builder
+	static void WrapperBitStream(unsigned long incomingBits);
+	static void WrapperBitStreamError(byte errorCode);
+	static void WrapperDCCPacket(byte *packetData, byte size);
+	static void WrapperDCCPacketError(byte errorCode);
+
+	// Turnout manager event handler wrappers
+	static void WrapperResetTimer();
+	static void WrapperErrorTimer();
+	static void WrapperServoTimer();
 };
 
 

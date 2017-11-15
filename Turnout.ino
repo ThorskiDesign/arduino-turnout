@@ -2,6 +2,7 @@
 #include <EEPROM.h>
 #include <Servo.h>
 #include "TurnoutMgr.h"
+#include "XoverMgr.h"
 
 
 TurnoutMgr TurnoutManager;

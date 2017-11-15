@@ -1,5 +1,5 @@
 
-#include "TurnoutMgr.h"
+#include "XoverMgr.h"
 
 
 // ========================================================================================================
@@ -7,15 +7,19 @@
 
 
 // TurnoutMgr constructor
-TurnoutMgr::TurnoutMgr()
+XoverMgr::XoverMgr()
 {
 	// set pointer to this instance of the turnout manager, so that we can reference it in callbacks
 	currentInstance = this;
 
 	// configure sensor/servo event handlers
 	button.SetButtonPressHandler(WrapperButtonPress);
-	osStraight.SetButtonPressHandler(WrapperOSStraight);
-	osCurved.SetButtonPressHandler(WrapperOSCurved);
+	osAB.SetButtonPressHandler(WrapperOSAB);
+	osCD.SetButtonPressHandler(WrapperOSCD);
+
+	// assign handler for servo move done events
+	for (byte i = 0; i < numServos; i++)
+		servo[i].SetServoMoveDoneHandler(WrapperServoMoveDone);
 
 	// configure dcc event handlers
 	dcc.SetBasicAccessoryDecoderPacketHandler(WrapperDCCAccPacket);
@@ -35,16 +39,11 @@ TurnoutMgr::TurnoutMgr()
 	errorTimer.SetTimerHandler(WrapperErrorTimer);
 	resetTimer.SetTimerHandler(WrapperResetTimer);
 	servoTimer.SetTimerHandler(WrapperServoTimer);
-
-	// configure servo event handlers
-	for (byte i = 0; i < numServos; i++)
-		servo[i].SetServoMoveDoneHandler(WrapperServoMoveDone);
-	servoTimer.SetTimerHandler(WrapperServoTimer);
 }
 
 
 // Check for factory reset, then proceed with main initialization
-void TurnoutMgr::Initialize()
+void XoverMgr::Initialize()
 {
 	// check for button hold on startup (for reset to defaults)
 	if (button.RawState() == LOW)
@@ -59,37 +58,35 @@ void TurnoutMgr::Initialize()
 
 
 // update sensors and outputs
-void TurnoutMgr::Update()
+void XoverMgr::Update()
 {
 	// do all the updates that TurnoutBase handles
 	TurnoutBase::Update();
 
 	// then update our sensors and servo
 	const unsigned long currentMillis = millis();
-	osStraight.Update(currentMillis);
-	osCurved.Update(currentMillis);
+	osAB.Update(currentMillis);
+	osCD.Update(currentMillis);
 
 	if (servosActive)
 		for (byte i = 0; i < numServos; i++)
 			servo[i].Update(currentMillis);
-
 }
 
 
-
-// ========================================================================================================
-// Private Methods
-
-
 // Initialize the turnout manager by setting up the dcc config, reading stored values from CVs, and setting up the servo
-void TurnoutMgr::InitMain()
+void XoverMgr::InitMain()
 {
 	// do the init stuff in TurnoutBase
 	TurnoutBase::InitMain();
 
+	// servo setup - get extents, rates, and last position from cv's
 	const int lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
 	const int highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
 	servo[0].Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, servoState[0][position]);
+	servo[1].Initialize(dcc.GetCV(CV_servo2MinTravel), dcc.GetCV(CV_servo2MaxTravel), lowSpeed, highSpeed, servoState[1][position]);
+	servo[2].Initialize(dcc.GetCV(CV_servo3MinTravel), dcc.GetCV(CV_servo3MaxTravel), lowSpeed, highSpeed, servoState[2][position]);
+	servo[3].Initialize(dcc.GetCV(CV_servo4MinTravel), dcc.GetCV(CV_servo4MaxTravel), lowSpeed, highSpeed, servoState[3][position]);
 
 	// set led and relays, and begin bitstream capture
 	EndServoMove();
@@ -101,7 +98,7 @@ void TurnoutMgr::InitMain()
 
 
 // set the turnout to a new position
-void TurnoutMgr::BeginServoMove()
+void XoverMgr::BeginServoMove()
 {
 	// store new position to cv
 	dcc.SetCV(CV_turnoutPosition, position);
@@ -113,8 +110,8 @@ void TurnoutMgr::BeginServoMove()
 	bitStream.Suspend();
 
 	// turn off the relays
-	relayStraight.SetPin(LOW);
-	relayCurved.SetPin(LOW);
+	for (byte i = 0; i < numServos; i++)
+		relay[i].SetPin(LOW);
 
 	// start pwm for current positions of all servos
 	for (byte i = 0; i < numServos; i++)
@@ -131,7 +128,7 @@ void TurnoutMgr::BeginServoMove()
 
 
 // resume normal operation after servo motion is complete
-void TurnoutMgr::EndServoMove()
+void XoverMgr::EndServoMove()
 {
 	// set the led solid for the current position
 	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::ON);
@@ -143,16 +140,9 @@ void TurnoutMgr::EndServoMove()
 	//for (byte i = 0; i < numServos; i++)
 	//	servo[i].StopPWM();
 
-	// enable the appropriate relay, swapping if needed
-	if ((position == STRAIGHT && !relaySwap) || (position == CURVED && relaySwap))
-	{
-		relayStraight.SetPin(HIGH);
-	}
-
-	if ((position == CURVED && !relaySwap) || ((position == STRAIGHT) && relaySwap))
-	{
-		relayCurved.SetPin(HIGH);
-	}
+	// enable the appropriate relay
+	for (byte i = 0; i < numServos; i++)
+		relay[i].SetPin(relayState[i][position]);
 
 	// resume the bitstream capture
 	servosActive = false;
@@ -161,12 +151,14 @@ void TurnoutMgr::EndServoMove()
 
 
 
+
+
 // ========================================================================================================
 // Event Handlers
 
 
 // do things after the servo finishes moving to its new position
-void TurnoutMgr::ServoMoveDoneHandler()
+void XoverMgr::ServoMoveDoneHandler()
 {
 	if (currentServo < numServos)
 	{
@@ -191,13 +183,13 @@ void TurnoutMgr::ServoMoveDoneHandler()
 
 
 // handle a button press
-void TurnoutMgr::ButtonEventHandler(bool ButtonState)
+void XoverMgr::ButtonEventHandler(bool ButtonState)
 {
 	// check button state (HIGH so we respond after button release)
 	if (ButtonState == HIGH)
 	{
 		// proceed only if both occupancy sensors are inactive (i.e., sensors override button press)
-		if (osStraight.SwitchState() == HIGH && osCurved.SwitchState() == HIGH)
+		if (osAB.SwitchState() == HIGH && osCD.SwitchState() == HIGH)
 		{
 			// toggle from current position and set new position
 			position = (State)!position;
@@ -214,38 +206,17 @@ void TurnoutMgr::ButtonEventHandler(bool ButtonState)
 }
 
 
-// handle straight occupancy sensor signal
-void TurnoutMgr::OSStraightHandler(bool ButtonState)
+void XoverMgr::OSABHandler(bool ButtonState)
 {
-	const State newPos = (occupancySensorSwap) ? CURVED : STRAIGHT;
-
-	// check occupancy sensor state (LOW so we respond when train detected)
-	if (ButtonState == LOW && newPos != position)
-	{
-		position = newPos;
-		servoRate = HIGH;
-		BeginServoMove();
-	}
 }
 
-
-// handle curved occupancy sensor signal
-void TurnoutMgr::OSCurvedHandler(bool ButtonState)
+void XoverMgr::OSCDHandler(bool ButtonState)
 {
-	const State newPos = (occupancySensorSwap) ? STRAIGHT : CURVED;
-
-	// check occupancy sensor state (LOW so we respond when train detected)
-	if (ButtonState == LOW && newPos != position)
-	{
-		position = newPos;
-		servoRate = HIGH;
-		BeginServoMove();
-	}
 }
 
 
 // handle a DCC basic accessory command, used for changing the state of the turnout
-void TurnoutMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
+void XoverMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
 {
 	// assume we are filtering repeated packets in the packet builder, so we don't check for that here
 	// assume DCCdecoder is set to return only packets for this decoder's address.
@@ -253,7 +224,7 @@ void TurnoutMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
 	State dccState = (Direction == 0) ? CURVED : STRAIGHT;
 	if (dccCommandSwap) dccState = (State)!dccState; // swap the interpretation of dcc command if needed
 
-	// if we are already in the desired position, just exit
+													 // if we are already in the desired position, just exit
 	if (dccState == position) return;
 
 #ifdef _DEBUG
@@ -262,7 +233,7 @@ void TurnoutMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
 #endif
 
 	// proceed only if both occupancy sensors are inactive (i.e., sensors override dcc command)
-	if (osStraight.SwitchState() == HIGH && osCurved.SwitchState() == HIGH)
+	if (osAB.SwitchState() == HIGH && osCD.SwitchState() == HIGH)
 	{
 		// set switch state based on dcc command
 		position = dccState;
@@ -278,9 +249,8 @@ void TurnoutMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
 }
 
 
-
 // handle a DCC program on main command
-void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value)
+void XoverMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value)
 {
 	// do most of the program on main stuff in TurnoutBase
 	TurnoutBase::DCCPomHandler(Addr, instType, CV, Value);
@@ -288,41 +258,57 @@ void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV
 	// update servo vars from eeprom
 	if (CV == CV_servo1MinTravel) servo[0].SetExtent(LOW, dcc.GetCV(CV_servo1MinTravel));
 	if (CV == CV_servo1MaxTravel) servo[0].SetExtent(HIGH, dcc.GetCV(CV_servo1MaxTravel));
-	if (CV == CV_servoLowSpeed) servo[0].SetDuration(LOW, dcc.GetCV(CV_servoLowSpeed) * 100);
-	if (CV == CV_servoHighSpeed) servo[0].SetDuration(HIGH, dcc.GetCV(CV_servoHighSpeed) * 100);
+
+	if (CV == CV_servo2MinTravel) servo[1].SetExtent(LOW, dcc.GetCV(CV_servo2MinTravel));
+	if (CV == CV_servo2MaxTravel) servo[1].SetExtent(HIGH, dcc.GetCV(CV_servo2MaxTravel));
+
+	if (CV == CV_servo3MinTravel) servo[2].SetExtent(LOW, dcc.GetCV(CV_servo3MinTravel));
+	if (CV == CV_servo3MaxTravel) servo[2].SetExtent(HIGH, dcc.GetCV(CV_servo3MaxTravel));
+
+	if (CV == CV_servo4MinTravel) servo[3].SetExtent(LOW, dcc.GetCV(CV_servo4MinTravel));
+	if (CV == CV_servo4MaxTravel) servo[3].SetExtent(HIGH, dcc.GetCV(CV_servo4MaxTravel));
+	
+	if (CV == CV_servoLowSpeed)
+		for (byte i = 0; i < numServos; i++)
+			servo[i].SetDuration(LOW, dcc.GetCV(CV_servoLowSpeed) * 100);
+	if (CV == CV_servoHighSpeed)
+		for (byte i = 0; i < numServos; i++)
+			servo[i].SetDuration(HIGH, dcc.GetCV(CV_servoHighSpeed) * 100);
 }
+
+
 
 
 // ========================================================================================================
 
-TurnoutMgr *TurnoutMgr::currentInstance = 0;    // pointer to allow us to access member objects from callbacks
+XoverMgr *XoverMgr::currentInstance = 0;    // pointer to allow us to access member objects from callbacks
 
 												// servo/sensor callback wrappers
-void TurnoutMgr::WrapperButtonPress(bool ButtonState) { currentInstance->ButtonEventHandler(ButtonState); }
-void TurnoutMgr::WrapperOSStraight(bool ButtonState) { currentInstance->OSStraightHandler(ButtonState); }
-void TurnoutMgr::WrapperOSCurved(bool ButtonState) { currentInstance->OSCurvedHandler(ButtonState); }
-void TurnoutMgr::WrapperServoMoveDone() { currentInstance->ServoMoveDoneHandler(); }
+void XoverMgr::WrapperButtonPress(bool ButtonState) { currentInstance->ButtonEventHandler(ButtonState); }
+void XoverMgr::WrapperOSAB(bool ButtonState) { currentInstance->OSABHandler(ButtonState); }
+void XoverMgr::WrapperOSCD(bool ButtonState) { currentInstance->OSCDHandler(ButtonState); }
+void XoverMgr::WrapperServoMoveDone() { currentInstance->ServoMoveDoneHandler(); }
 
 
 // ========================================================================================================
 // dcc processor callback wrappers
 
-void TurnoutMgr::WrapperDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte data)
+void XoverMgr::WrapperDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte data)
 {
 	currentInstance->DCCAccCommandHandler(outputAddress, data);
 }
 
-void TurnoutMgr::WrapperDCCExtPacket(int boardAddress, int outputAddress, byte data)
+void XoverMgr::WrapperDCCExtPacket(int boardAddress, int outputAddress, byte data)
 {
 	currentInstance->DCCExtCommandHandler(outputAddress, data);
 }
 
-void TurnoutMgr::WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byte instructionType, int cv, byte data)
+void XoverMgr::WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byte instructionType, int cv, byte data)
 {
 	currentInstance->DCCPomHandler(outputAddress, instructionType, cv, data);
 }
 
-void TurnoutMgr::WrapperDCCDecodingError(byte errorCode)
+void XoverMgr::WrapperDCCDecodingError(byte errorCode)
 {
 	// TODO: add optional LED indication
 
@@ -336,31 +322,31 @@ void TurnoutMgr::WrapperDCCDecodingError(byte errorCode)
 // wrappers for callbacks in TurnoutBase ================================================================
 
 // this is called from the bitstream capture when there are 32 bits to process.
-void TurnoutMgr::WrapperBitStream(unsigned long incomingBits)
+void XoverMgr::WrapperBitStream(unsigned long incomingBits)
 {
 	currentInstance->dccPacket.ProcessIncomingBits(incomingBits);
 }
 
-void TurnoutMgr::WrapperBitStreamError(byte errorCode)
+void XoverMgr::WrapperBitStreamError(byte errorCode)
 {
 	currentInstance->bitErrorCount++;
 }
 
 
 // this is called by the packet builder when a complete packet is ready, to kick off the actual decoding
-void TurnoutMgr::WrapperDCCPacket(byte *packetData, byte size)
+void XoverMgr::WrapperDCCPacket(byte *packetData, byte size)
 {
 	// kick off the packet processor
 	currentInstance->dcc.ProcessPacket(packetData, size);
 }
 
-void TurnoutMgr::WrapperDCCPacketError(byte errorCode)
+void XoverMgr::WrapperDCCPacketError(byte errorCode)
 {
 	currentInstance->packetErrorCount++;
 }
 
 
 // timer callback wrappers
-void TurnoutMgr::WrapperResetTimer() { currentInstance->ResetTimerHandler(); }
-void TurnoutMgr::WrapperErrorTimer() { currentInstance->ErrorTimerHandler(); }
-void TurnoutMgr::WrapperServoTimer() { currentInstance->EndServoMove(); }
+void XoverMgr::WrapperResetTimer() { currentInstance->ResetTimerHandler(); }
+void XoverMgr::WrapperErrorTimer() { currentInstance->ErrorTimerHandler(); }
+void XoverMgr::WrapperServoTimer() { currentInstance->EndServoMove(); }
