@@ -31,7 +31,7 @@ void TurnoutBase::Update()
 	bitStream.ProcessTimestamps();
 
 	// do the updates to maintain flashing led and slow servo motion
-	unsigned long currentMillis = millis();
+	const unsigned long currentMillis = millis();
 	led.Update(currentMillis);
 
 	// timer updates
@@ -89,7 +89,7 @@ void TurnoutBase::Update()
 void TurnoutBase::InitMain()
 {
 	// Configure and initialize the DCC packet processor (accessory decoder in output address mode)
-	byte cv29 = DCCdecoder::CV29_ACCESSORY_DECODER | DCCdecoder::CV29_OUTPUT_ADDRESS_MODE;
+	const byte cv29 = DCCdecoder::CV29_ACCESSORY_DECODER | DCCdecoder::CV29_OUTPUT_ADDRESS_MODE;
 	dcc.SetupDecoder(0, 0, cv29, false);
 
 	// get variables from cv's
@@ -118,7 +118,7 @@ void TurnoutBase::FactoryReset(bool HardReset)
 #endif
 
 	factoryReset = true;    // set flag indicating we are in reset
-	unsigned long resetDelay = 2500;  // time to flash led so we have indication of reset occuring
+	const unsigned long resetDelay = 2500;  // time to flash led so we have indication of reset occuring
 
 									  // normal initilization will resume after this timer expires
 	resetTimer.StartTimer(resetDelay);
@@ -134,7 +134,7 @@ void TurnoutBase::FactoryReset(bool HardReset)
 	showErrorIndication = true;
 
 	// do the cv reset
-	unsigned int numCVs = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
+	const unsigned int numCVs = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
 	for (unsigned int cv = 0; cv < numCVs; cv++)
 	{
 		if (HardReset || FactoryDefaultCVs[cv].SoftReset)
@@ -254,7 +254,7 @@ void TurnoutBase::DCCPomHandler(unsigned int Addr, byte instType, unsigned int C
 
 	// check against our defined CVs to verify that the CV is valid
 	boolean isValidCV = false;
-	unsigned int numCVs = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
+	const unsigned int numCVs = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
 	for (unsigned int i = 0; i < numCVs; i++)
 	{
 		if (CV == FactoryDefaultCVs[i].CV) isValidCV = true;

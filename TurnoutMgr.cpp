@@ -65,7 +65,7 @@ void TurnoutMgr::Update()
 	TurnoutBase::Update();
 
 	// then update our sensors and servo
-	unsigned long currentMillis = millis();
+	const unsigned long currentMillis = millis();
 	osStraight.Update(currentMillis);
 	osCurved.Update(currentMillis);
 
@@ -87,8 +87,8 @@ void TurnoutMgr::InitMain()
 	// do the init stuff in TurnoutBase
 	TurnoutBase::InitMain();
 
-	int lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
-	int highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
+	const int lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
+	const int highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
 	servo[0].Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, servoState[0][position]);
 
 	// set led and relays, and begin bitstream capture
@@ -184,7 +184,7 @@ void TurnoutMgr::ServoMoveDoneHandler()
 	}
 	else
 	{
-		int servoPowerOffDelay = 500;    // ms
+		const int servoPowerOffDelay = 500;    // ms
 		servoTimer.StartTimer(servoPowerOffDelay);
 	}
 }
@@ -217,7 +217,7 @@ void TurnoutMgr::ButtonEventHandler(bool ButtonState)
 // handle straight occupancy sensor signal
 void TurnoutMgr::OSStraightHandler(bool ButtonState)
 {
-	State newPos = (occupancySensorSwap) ? CURVED : STRAIGHT;
+	const State newPos = (occupancySensorSwap) ? CURVED : STRAIGHT;
 
 	// check occupancy sensor state (LOW so we respond when train detected)
 	if (ButtonState == LOW && newPos != position)
@@ -232,7 +232,7 @@ void TurnoutMgr::OSStraightHandler(bool ButtonState)
 // handle curved occupancy sensor signal
 void TurnoutMgr::OSCurvedHandler(bool ButtonState)
 {
-	State newPos = (occupancySensorSwap) ? STRAIGHT : CURVED;
+	const State newPos = (occupancySensorSwap) ? STRAIGHT : CURVED;
 
 	// check occupancy sensor state (LOW so we respond when train detected)
 	if (ButtonState == LOW && newPos != position)
@@ -250,8 +250,7 @@ void TurnoutMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
 	// assume we are filtering repeated packets in the packet builder, so we don't check for that here
 	// assume DCCdecoder is set to return only packets for this decoder's address.
 
-	State dccState;
-	dccState = (Direction == 0) ? CURVED : STRAIGHT;
+	State dccState = (Direction == 0) ? CURVED : STRAIGHT;
 	if (dccCommandSwap) dccState = (State)!dccState; // swap the interpretation of dcc command if needed
 
 	// if we are already in the desired position, just exit
