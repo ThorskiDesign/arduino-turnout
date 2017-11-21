@@ -5,31 +5,10 @@
 boolean BitStream::lastPinState = 0;
 SimpleQueue BitStream::simpleQueue;
 
-
-// set up the bitstream capture using the ICR and default timings
-BitStream::BitStream(byte InterruptPin, boolean WithPullup)
+BitStream::BitStream()
 {
-	interruptPin = InterruptPin;
-	pinMode(interruptPin, WithPullup ? INPUT_PULLUP : INPUT);
-}
-
-
-// set up the bitstream capture
-BitStream::BitStream(byte InterruptPin, boolean WithPullup, boolean UseICR) : BitStream(InterruptPin, WithPullup)
-{
-	useICR = UseICR;
-}
-
-
-// set up the bitstream capture with non-default timings
-BitStream::BitStream(byte InterruptPin, boolean WithPullup, boolean UseICR, unsigned int OneMin, unsigned int OneMax,
-	unsigned int ZeroMin, unsigned int ZeroMax, byte MaxErrors) : BitStream(InterruptPin, WithPullup, UseICR)
-{
-	timeOneMin = OneMin * CLOCK_SCALE_FACTOR;
-	timeOneMax = OneMax * CLOCK_SCALE_FACTOR;
-	timeZeroMin = ZeroMin * CLOCK_SCALE_FACTOR;
-	timeZeroMax = ZeroMax * CLOCK_SCALE_FACTOR;
-	maxBitErrors = MaxErrors;
+	pinMode(HWirqPin, INPUT_PULLUP);
+	pinMode(ICRPin, INPUT_PULLUP);
 }
 
 
@@ -51,9 +30,15 @@ void BitStream::SetErrorHandler(ErrorHandler Handler)
 void BitStream::Suspend()
 {
 	noInterrupts();
+
 	stateFunctionPointer = 0;
-	detachInterrupt(digitalPinToInterrupt(interruptPin));   // disable the h/w interrupt
-	//TIMSK1 = 0;                                             // disable input capture interrupt
+
+#if defined(TIMER1_ICR_0PS) || defined(TIMER1_ICR_8PS)
+	TIMSK1 = 0;                                             // disable input capture interrupt
+#else
+	detachInterrupt(digitalPinToInterrupt(HWirqPin));   // disable the h/w interrupt
+#endif
+
 	interrupts();
 }
 
@@ -63,26 +48,6 @@ void BitStream::Resume()
 {
 	noInterrupts();
 
-	// Configure timer1 for use in getting interrupt timing.
-	//TCCR1A = 0;    // reset the registers initially
-	//TCCR1B = 0;
-	//TCCR1C = 0;
-	//TCNT1 = 0;
-	//TIMSK1 = 0;
-	////TCCR1B |= (1 << 1);   // set CS11 bit for 8 prescaler (0.5 us resolution, overflow every 32 ms)
-	//TCCR1B |= (1 << 0);   // set CS10 bit for no prescaler (0.0625 us resolution, overflow every 4 ms)
-
-	// configure timer2
-	TCCR2A = 0;
-	TCCR2B = 0;
-	TCNT2 = 0;
-	TIMSK2 = 0;
-	TCCR2B |= (1 << 0); TCCR2B |= (1 << 1);  // set CS20 and CS21 bits for 32 prescaler (2.0 us resolution, overflow every 0.5 ms)
-											 
-	// input capture register configuration
-	//TCCR1B |= (1 << 6);  // set input capture edge select bit for rising
-	//TCCR1B |= (1 << 7);  // set input capture noise canceler
-
 	// initialize the outgoing queue
 	queueSize = 0;
 	bitData = 0;
@@ -91,15 +56,63 @@ void BitStream::Resume()
 	simpleQueue.Reset();    // reset the queue of DCC timestamps
 	stateFunctionPointer = &BitStream::StateStartup;
 
-	// set starting time and configure interrupt
-	if (useICR)
-	{
-		//TIMSK1 |= (1 << 5);  // enable input capture interrupt
-	}
-	else
-	{
-		attachInterrupt(digitalPinToInterrupt(interruptPin), GetIrqTimestamp, CHANGE);   // enable h/w interrupt
-	}
+#if defined(TIMER1_HW_0PS)
+	TCCR1A = 0;    // reset the registers initially
+	TCCR1B = 0;
+	TCCR1C = 0;
+	TCNT1 = 0;
+	TIMSK1 = 0;
+	TCCR1B |= (1 << 0);   // set CS10 bit for no prescaler (0.0625 us resolution, overflow every 4 ms)
+	attachInterrupt(digitalPinToInterrupt(HWirqPin), GetTimestamp, CHANGE);   // enable h/w interrupt
+#endif
+#if defined(TIMER1_HW_8PS)
+	TCCR1A = 0;    // reset the registers initially
+	TCCR1B = 0;
+	TCCR1C = 0;
+	TCNT1 = 0;
+	TIMSK1 = 0;
+	TCCR1B |= (1 << 1);   // set CS11 bit for 8 prescaler (0.5 us resolution, overflow every 32 ms)
+	attachInterrupt(digitalPinToInterrupt(HWirqPin), GetTimestamp, CHANGE);   // enable h/w interrupt
+#endif
+#if defined(TIMER1_ICR_0PS)
+	TCCR1A = 0;    // reset the registers initially
+	TCCR1B = 0;
+	TCCR1C = 0;
+	TCNT1 = 0;
+	TIMSK1 = 0;
+	TCCR1B |= (1 << 0);  // set CS10 bit for no prescaler (0.0625 us resolution, overflow every 4 ms)
+	TCCR1B |= (1 << 6);  // set input capture edge select bit for rising
+	TCCR1B |= (1 << 7);  // set input capture noise canceler
+	TIMSK1 |= (1 << 5);  // enable input capture interrupt
+#endif
+#if defined(TIMER1_ICR_8PS)
+	TCCR1A = 0;    // reset the registers initially
+	TCCR1B = 0;
+	TCCR1C = 0;
+	TCNT1 = 0;
+	TIMSK1 = 0;
+	TCCR1B |= (1 << 1);   // set CS11 bit for 8 prescaler (0.5 us resolution, overflow every 32 ms)
+	TCCR1B |= (1 << 6);  // set input capture edge select bit for rising
+	TCCR1B |= (1 << 7);  // set input capture noise canceler
+	TIMSK1 |= (1 << 5);  // enable input capture interrupt
+#endif
+#if defined(TIMER2_HW_8PS)
+	TCCR2A = 0;
+	TCCR2B = 0;
+	TCNT2 = 0;
+	TIMSK2 = 0;
+	TCCR2B |= (1 << 1);  	// set CS21 bit for 8 prescaler (0.5 us resolution, overflow every 127.5 us)
+	attachInterrupt(digitalPinToInterrupt(HWirqPin), GetTimestamp, CHANGE);   // enable h/w interrupt
+#endif
+#if defined(TIMER2_HW_32PS)
+	TCCR2A = 0;
+	TCCR2B = 0;
+	TCNT2 = 0;
+	TIMSK2 = 0;
+	TCCR2B |= (1 << 0); // set CS20 and CS21 bits for 32 prescaler (2.0 us resolution, overflow every 0.5 ms)
+	TCCR2B |= (1 << 1);
+	attachInterrupt(digitalPinToInterrupt(HWirqPin), GetTimestamp, CHANGE);   // enable h/w interrupt
+#endif
 
 	interrupts();
 }
@@ -263,15 +276,20 @@ void BitStream::QueuePut(boolean newBit)
 
 
 // get pulse timings using hardware interrupt
-void BitStream::GetIrqTimestamp()    // static
+void BitStream::GetTimestamp()    // static
 {
 	// get the timer count before we do anything else
-	unsigned int count = TCNT2;
+#if defined (TIMER1_HW_0PS) || defined(TIMER1_ICR_0PS) || defined(TIMER1_HW_8PS) || defined(TIMER1_ICR_8PS)
+	const unsigned int count = TCNT1;
+#endif
+#if defined(TIMER2_HW_8PS) || defined(TIMER2_HW_32PS)
+	const byte count = TCNT2;
+#endif
 
 	// timestamp assignment complete ~3 us after DCC state change
 
 	// check pinstate for change (TODO: why are there spurious IRQs here?
-	boolean pinState = HW_IRQ_PORT();                 // this takes ~0.2 us
+	const boolean pinState = HW_IRQ_PORT();                 // this takes ~0.2 us
 	if (pinState == lastPinState) return;
 	lastPinState = pinState;
 
@@ -285,7 +303,7 @@ void BitStream::GetIrqTimestamp()    // static
 // get pulse timings using input capture register
 ISR(TIMER1_CAPT_vect)        // static, global
 {
-	unsigned int capture = ICR1;    // store the capture register before we do anything else
+	const unsigned int capture = ICR1;    // store the capture register before we do anything else
 	TCCR1B ^= 0x40;                 // toggle the edge select bit,  (1<<6) = 0x40
 
 	BitStream::simpleQueue.Put(capture);      // add the value in the input capture register to the queue

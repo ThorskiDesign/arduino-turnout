@@ -8,8 +8,8 @@ http://www.nmra.org/sites/default/files/standards/sandrp/pdf/s-9.1_electrical_st
 
 Summary:
 
-An input capture register is configured so that each time the signal transitions, the ISR is called. 
-In the ISR, the time of the interrupt in Timer1 counts is stored in a queue as an unsigned int. 
+A hardware interrupt or input capture register is configured so that each time the signal transitions,
+an ISR is called. In the ISR, the time of the interrupt in timer counts is stored in a queue. 
 When the timestamps are retrieved from the queue, the time between the current timestamp and the 
 previous timestamp is used to determine whether the current half of the bit indicates a 0 or a 1. 
 After a valid bit is found, it is added to an output queue. When the output queue is full, a callback 
@@ -17,8 +17,7 @@ is performed to provide the data.
 
 Example usage:
 
-    BitStream bitStream(DCCPin, false);                 // create bitstream using ICR and default timings
-    BitStream bitStream(DCCPin, false, true 48, 68, 88, 10000, 10);    // create bitstream using non-standard timings
+    BitStream bitStream();                              // create the bitstream object
     bitStream.Resume();                                 // start the bitstream capture
 	bitStream.Suspend();                                // stop the bitstream capture
 	bitStream.ProcessTimeStamps();					    // process any DCC timestamps in the queue
@@ -32,6 +31,14 @@ signal and captures timestamps of the DCC events in a queue. The edge select bit
 register is toggled each time in the ISR, so that both rising and falling edges are captured. The 
 hardware interrupt is similarly configured on CHANGE.
 
+Six combinations of interrupt type, timer, and prescaler are available. Different ISRs are used for
+hardware interrupt vs. the input capture register. Calcualtion of the pulse width is done using 
+unsigned int or byte depending on the selection of timer1 or timer2, so that overflows are handled 
+correctly. A clock scale factor specifies the number of timer counts per microsecond and is set
+according to the selected prescaler. Standard DCC timings are used when using the input capture
+register. Slightly wider timings are more reliable for the hardware interrupt due to the effect of
+other ISRs that may be running.
+
 The inspection of the timestamps is performed in three states. In the startup state, pulses are
 inspected to find the first valid half bit. After this, processing proceeds to the seek state, where
 the bits are examined for a transition from 1 to 0 or from 0 to 1, in order to establish which half bit
@@ -41,23 +48,17 @@ bits that makes up a full bit. When a complete bit is found, it is added to the 
 checking is performed on each half bit. If a half bit does not fall within the valid ranges for a 
 0 or 1, a callback is triggered and a counter incremented. After a configurable number of consecutive 
 bit errors, another callback is triggered and processing reverts to the startup state. The bit error 
-count is reset after each complete bit. The timestamp queue, period calculations, etc. are done 
-using unsigned int so that the Timer1 overflow is handled transparently.
+count is reset after each complete bit. 
 
 Suspend/Resume methods allow starting, stopping, or resetting the bitstream capture, depending
 on outside factors (for example, during times when the signal may be degraded, or when other higher
 priority processing needs to take place). The input capture or hardware interrupt is disabled when 
-suspended, and enabled when resumed. Timer1 is configured in the Resume method, so that it can be 
+suspended, and enabled when resumed. The timer is configured in the Resume method, so that it can be 
 used for other purposes (e.g. servo) when the bitstream capture is suspended.
 
 The output queue is an unsigned long, into which 32 bits are stored as they are received. The queue is
 shifted left each time a bit is added, so the bits are stored left to right in the order in which 
 the are received. After 32 bits have been stored, a callback is triggered, and the queue is reset.
-
-Notes on hardware interrupt timing: The hardware interrupt ISR in NORMAL mode takes 2.5 microseconds
-to run, so any pulses faster than that will get lost or have questionable timestamps. Additionally, 
-other interrupts may affect the timing of this interrupt. The timing based on the input capture register 
-(used by default) is not subject to these effects. 
 
 */
 
@@ -90,17 +91,40 @@ other interrupts may affect the timing of this interrupt. The timing based on th
 #define ERR_INVALID_HALF_BIT_HIGH        4
 #define ERR_SEQUENTIAL_ERROR_LIMIT       10
 
+// set the timer/prescaler combination to use
+//#define TIMER1_HW_0PS    // use timer1 hardware irq with no prescaler
+//#define TIMER1_HW_8PS    // use timer1 hardware irq with 8 prescaler
+//#define TIMER1_ICR_0PS   // use timer1 input capture register with no prescaler
+//#define TIMER1_ICR_8PS   // use timer1 input capture register with 8 prescaler
+//#define TIMER2_HW_8PS    // use timer2 hardware irq with 8 prescaler
+#define TIMER2_HW_32PS   // use timer2 hardware irq with 32 prescaler
+
+// use standard DCC timings for ICR
+#if defined(TIMER1_ICR_0PS) || defined(TIMER1_ICR_8PS)
 #define DCC_DEFAULT_ONE_MIN				52
 #define DCC_DEFAULT_ONE_MAX				64
 #define DCC_DEFAULT_ZERO_MIN			90
 #define DCC_DEFAULT_ZERO_MAX			110    // 110 us for normal bit, 10000 us to allow zero-stretching
+#endif
 
-#define CLOCK_SCALE_FACTOR				0.5F     // number of clock ticks per microsecond
-                                                 // 32 prescaler gives a 2.0 us interval
-//#define CLOCK_SCALE_FACTOR				2U       // number of clock ticks per microsecond
-//                                                 // 8 prescaler gives a 0.5 us interval
-//#define CLOCK_SCALE_FACTOR				16U      // number of clock ticks per microsecond
-//												 // no prescaler gives a 0.0625 us interval
+// use wider timings for hardware IRQ
+#if defined (TIMER1_HW_0PS) || defined(TIMER1_HW_8PS) || defined (TIMER2_HW_8PS) || defined(TIMER2_HW_32PS)
+#define DCC_DEFAULT_ONE_MIN				48
+#define DCC_DEFAULT_ONE_MAX				68
+#define DCC_DEFAULT_ZERO_MIN			88
+#define DCC_DEFAULT_ZERO_MAX			120
+#endif
+
+// set clock scale factor based on prescaler (number of clock ticks per microsecond)
+#if defined(TIMER1_HW_0PS) || defined(TIMER1_ICR_0PS)
+#define CLOCK_SCALE_FACTOR 16U;   // no prescaler gives a 0.0625 us interval
+#endif
+#if defined(TIMER1_HW_8PS) || defined(TIMER1_ICR_8PS) || defined(TIMER2_HW_8PS)
+#define CLOCK_SCALE_FACTOR 2U;    // 8 prescaler gives a 0.5 us interval
+#endif
+#if defined(TIMER2_HW_32PS)
+#define CLOCK_SCALE_FACTOR 0.5F;  // 32 prescaler gives a 2.0 us interval
+#endif
 
 
 class BitStream
@@ -109,15 +133,8 @@ public:
     typedef void (*DataFullHandler)(unsigned long BitData);
     typedef void (*ErrorHandler)(byte ErrorCode);
 
-	// set up the bitstream capture using the ICR and default timings
-	BitStream(byte InterruptPin, boolean WithPullup);
-
-    // set up the bitstream capture
-    BitStream(byte interruptPin, boolean withPullup, boolean useICR);
-
-    // set up the bitstream capture with non-default timings
-    BitStream(byte interruptPin, boolean withPullup, boolean useICR,
-		unsigned int OneMin, unsigned int OneMax, unsigned int ZeroMin, unsigned int ZeroMax, byte MaxErrors);
+	// create the bitstream object
+	BitStream();
 
     // configure the callback handlers
     void SetDataFullHandler(DataFullHandler Handler);
@@ -133,6 +150,10 @@ public:
 	static SimpleQueue simpleQueue;         // queue for the DCC timestamps
 
 private:
+	// Hardware assignments
+	const byte HWirqPin = 2;
+	const byte ICRPin = 8;
+
 	// state pointer and functions
 	typedef void(BitStream::*StateFunctionPointer)();
 	StateFunctionPointer stateFunctionPointer = 0;
@@ -142,9 +163,16 @@ private:
 	void HandleError();
 
 	// declare these as byte for 8 bit timers, unsigned int for 16 bit timers
+#if defined (TIMER1_HW_0PS) || defined(TIMER1_ICR_0PS) || defined(TIMER1_HW_8PS) || defined(TIMER1_ICR_8PS)
+	unsigned int currentCount = 0;          // timer count for the last pulse
+	unsigned int period = 0;                // period of the current pulse
+	unsigned int lastInterruptCount = 0;    // Timer1 count at the last interrupt
+#endif
+#if defined(TIMER2_HW_8PS) || defined(TIMER2_HW_32PS)
 	byte currentCount = 0;          // timer count for the last pulse
 	byte period = 0;                // period of the current pulse
 	byte lastInterruptCount = 0;    // Timer1 count at the last interrupt
+#endif
 
 	// bitstream capture vars
 	boolean isOne = false;                  // pulse is within the limits for a 1
@@ -153,18 +181,16 @@ private:
 	boolean endOfBit = false;               // second half-bit indicator
 
 	// DCC microsecond 0 & 1 timings
-    unsigned int timeOneMin = DCC_DEFAULT_ONE_MIN * CLOCK_SCALE_FACTOR;
-    unsigned int timeOneMax = DCC_DEFAULT_ONE_MAX * CLOCK_SCALE_FACTOR;
-    unsigned int timeZeroMin = DCC_DEFAULT_ZERO_MIN * CLOCK_SCALE_FACTOR;
-    unsigned int timeZeroMax = DCC_DEFAULT_ZERO_MAX * CLOCK_SCALE_FACTOR;
+	const unsigned int timeOneMin = DCC_DEFAULT_ONE_MIN * CLOCK_SCALE_FACTOR;
+	const unsigned int timeOneMax = DCC_DEFAULT_ONE_MAX * CLOCK_SCALE_FACTOR;
+	const unsigned int timeZeroMin = DCC_DEFAULT_ZERO_MIN * CLOCK_SCALE_FACTOR;
+	const unsigned int timeZeroMax = DCC_DEFAULT_ZERO_MAX * CLOCK_SCALE_FACTOR;
 
     // Event handlers
     DataFullHandler dataFullHandler = 0;    // handler for the data full event
     ErrorHandler errorHandler = 0;          // handler for errors
 
     // Interrupt and error variables
-	boolean useICR = true;                  // use the input capture register rather than the hardware interrupt
-    byte interruptPin;                      // the pin for the hardware irq
     byte bitErrorCount = 0;                 // current number of sequential bit errors
     byte maxBitErrors = 5;                  // max number of bit errors before we revert to startup state
 	static boolean lastPinState;            // last state of the IRQ pin
@@ -176,7 +202,7 @@ private:
 
     // private methods
     void QueuePut(boolean newBit);          // adds a bit to the queue
-	static void GetIrqTimestamp();		    // get and queue the timestamp of an interrupt
+	static void GetTimestamp();		        // get and queue the timestamp from a hw interrupt
 };
 
 #endif

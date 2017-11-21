@@ -15,8 +15,7 @@ TurnoutBase::TurnoutBase() :
 	servoPower(ServoPowerPin),
 	auxOutput1(Aux1Pin),
 	auxOutput2(Aux2Pin),
-	bitStream(HWirqPin, false, false, 48, 68, 88, 120, 10),    // bitstream capture object, non-standard timings
-	//bitStream(HWirqPin, false, false),                           // bitstream capture object
+	bitStream(),
 	dccPacket(true, true, 250),                         // DCC packet builder
 	dcc()                                               // DCC packet processor
 {
