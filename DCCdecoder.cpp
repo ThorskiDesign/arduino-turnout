@@ -35,12 +35,6 @@ void DCCdecoder::SetupDecoder(byte mfgID, byte mfgVers, byte cv29, boolean allPa
 
 // CV Support  =======================================================================
 
-void DCCdecoder::SetCVUpdateHandler(CVUpdateCallback func)
-{
-    func_CVUpdateCallback = func;
-}
-
-
 // read a CV
 byte DCCdecoder::GetCV(int cv)
 {
@@ -63,12 +57,12 @@ boolean DCCdecoder::SetCV(int cv, byte newValue)
     if (!CVIsValidForWrite(cv)) return false;
 
     // is the value we're writing different from what is stored?
-    byte currentValue = EEPROM.read(cv);
+	const byte currentValue = EEPROM.read(cv);
     if (newValue != currentValue)
     {
         EEPROM.update(cv, newValue);
-        if (func_CVUpdateCallback)    // callback if we are writing a new value
-            func_CVUpdateCallback(cv, currentValue, newValue);
+        if (cvUpdateHandler)    // callback if we are writing a new value
+            cvUpdateHandler(cv, currentValue, newValue);
         return true;
     }
 
@@ -82,15 +76,15 @@ int DCCdecoder::Address()
 {
     int address;
 
-    byte cv29 = GetCV(kCV_ConfigurationData1);
+	const byte cv29 = GetCV(kCV_ConfigurationData1);
 
-    if( cv29 & 0x80 )   // Is this an accessory decoder?
+    if( cv29 & CV29_ACCESSORY_DECODER )   // Is this an accessory decoder?
     {
         address = GetCV(kCV_AddressMSB)<<6 | GetCV(kCV_AddressLSB);        
     }
     else
     {
-        if( cv29 & 0x20 )   // Multifunction using extended addresses?
+        if( cv29 & CV29_EXT_ADDRESSING )   // Multifunction using extended addresses?
         {
             address = GetCV(kCV_ExtendedAddress1)<<8 | GetCV(kCV_ExtendedAddress2);        
         }
@@ -106,59 +100,17 @@ int DCCdecoder::Address()
 
 // Set callback handlers  ==========================================================
 
-void DCCdecoder::SetBaselineControlPacketHandler(BaselineControlPacket func)
-{
-    func_BaselineControlPacket = func;
-}
+void DCCdecoder::SetBaselineControlPacketHandler(BasicControlHandler handler) { basicControlHandler = handler; }
+void DCCdecoder::SetBasicAccessoryDecoderPacketHandler(BasicAccHandler handler) { basicAccHandler = handler; }
+void DCCdecoder::SetBasicAccessoryPomPacketHandler(AccPomHandler handler) { basicAccPomHandler = handler; }
+void DCCdecoder::SetLegacyAccessoryPomPacketHandler(AccPomHandler handler) { legacyAccPomHandler = handler; }
+void DCCdecoder::SetExtendedAccessoryDecoderPacketHandler(ExtendedAccHandler handler) { extendedAccHandler = handler; }
+void DCCdecoder::SetExtendedAccessoryPomPacketHandler(AccPomHandler handler) { extAccPomHandler = handler; }
+void DCCdecoder::SetIdlePacketHandler(IdleResetHandler handler) { idleHandler = handler; }
+void DCCdecoder::SetResetPacketHandler(IdleResetHandler handler) { resetHandler = handler; }
 
-
-void DCCdecoder::SetBasicAccessoryDecoderPacketHandler(BasicAccDecoderPacket func)
-{
-    func_BasicAccPacket = func;
-}
-
-
-void DCCdecoder::SetBasicAccessoryPomPacketHandler(AccDecoderPomPacket func)
-{
-    func_BasicAccPomPacket = func;
-}
-
-
-void DCCdecoder::SetLegacyAccessoryPomPacketHandler(AccDecoderPomPacket func)
-{
-    func_LegacyAccPomPacket = func;
-}
-
-
-void DCCdecoder::SetExtendedAccessoryDecoderPacketHandler(ExtendedAccDecoderPacket func)
-{
-    func_ExtdAccPacket = func;
-}
-
-
-void DCCdecoder::SetExtendedAccessoryPomPacketHandler(AccDecoderPomPacket func)
-{
-    func_ExtdAccPomPacket = func;
-}
-
-
-void DCCdecoder::SetIdlePacketHandler(IdleResetPacket func)
-{
-    func_IdlePacket = func;
-}
-
-
-void DCCdecoder::SetResetPacketHandler(IdleResetPacket func)
-{
-    func_ResetPacket = func;
-}
-
-
-void DCCdecoder::SetDecodingErrorHandler(DecodingErrorHandler func)
-{
-    func_DecodingErrorHandler = func;
-}
-
+void DCCdecoder::SetDecodingErrorHandler(DecodingErrorHandler handler) { decodingErrorHandler = handler; }
+void DCCdecoder::SetCVUpdateHandler(CVUpdateHandler handler) { cvUpdateHandler = handler; }
 
 
 // Packet processing   =========================================================================
@@ -191,8 +143,8 @@ void DCCdecoder::ProcessPacket(byte *packetData, byte size)
     else    // exit with error if we can't identify the packet
     {
         packetType = UNKNOWNPKT;
-        if (func_DecodingErrorHandler)
-            func_DecodingErrorHandler(kDCC_ERR_UNKNOWN_PACKET);
+        if (decodingErrorHandler)
+            decodingErrorHandler(kDCC_ERR_UNKNOWN_PACKET);
         return;
     }
 
@@ -225,8 +177,8 @@ void DCCdecoder::ProcessPacket(byte *packetData, byte size)
 // Process an idle packet
 void DCCdecoder::ProcessIdlePacket()
 {
-    if(func_IdlePacket)
-        (func_IdlePacket)(packetSize,packet);
+    if(idleHandler)
+        (idleHandler)(packetSize,packet);
 }
 
 
@@ -236,8 +188,8 @@ void DCCdecoder::ProcessBroadcastPacket()
     //  reset packet
     if (packet[1] == 0x00)
     {
-        if(func_ResetPacket)
-            (func_ResetPacket)(packetSize,packet);
+        if(resetHandler)
+            (resetHandler)(packetSize,packet);
     }
 
     //  broadcast stop packet
@@ -284,12 +236,12 @@ void DCCdecoder::ProcessShortLocoPacket()
         }
     }
 
-    // Make callback
+    // do callback
     boolean isPacketForThisAddress = (addressByte == GetCV(kCV_PrimaryAddress));
     if (isPacketForThisAddress || returnAllPackets)
     {
-        if(func_BaselineControlPacket)
-            func_BaselineControlPacket(addressByte,speedBits,directionBit);
+        if(basicControlHandler)
+            basicControlHandler(addressByte,speedBits,directionBit);
     }
 }
 
@@ -309,22 +261,22 @@ void DCCdecoder::ProcessAccBroadcastPacket()
     // basic acc packet
     if ((packet[1] & 0xF0) == 0x80)
     {
-        if (func_BasicAccPacket)
-            func_BasicAccPacket(0, 0, (packet[1] & 0x08)>>3, (packet[1] & 0x01));
+        if (basicAccHandler)
+            basicAccHandler(0, 0, (packet[1] & 0x08)>>3, (packet[1] & 0x01));
         return;
     }
 
     // extended acc packet
     if ((packet[1] & 0xFF) == 0x07)
     {
-        if (func_ExtdAccPacket)
-            func_ExtdAccPacket(0, 0, packet[2] & 0x1F);
+        if (extendedAccHandler)
+            extendedAccHandler(0, 0, packet[2] & 0x1F);
         return;
     }
 
     // we got here somehow with an incorrectly identified packet
-    if (func_DecodingErrorHandler)
-        func_DecodingErrorHandler(kDCC_ERR_UNKNOWN_PACKET);
+    if (decodingErrorHandler)
+        decodingErrorHandler(kDCC_ERR_UNKNOWN_PACKET);
 }
 
 
@@ -332,7 +284,7 @@ void DCCdecoder::ProcessAccBroadcastPacket()
 void DCCdecoder::ProcessAccPacket()
 {
     // combine packet bytes for comparison against packet specs
-    unsigned long comp = ((unsigned long)packet[1] << 8) | packet[2];
+	const unsigned long comp = ((unsigned long)packet[1] << 8) | packet[2];
 
     // loop through packet specs and check against current packet to identify it
     int i = 0;
@@ -352,8 +304,8 @@ void DCCdecoder::ProcessAccPacket()
     }
     else    // exit with error if we can't identify the packet
     {
-        if (func_DecodingErrorHandler)
-            func_DecodingErrorHandler(kDCC_ERR_UNKNOWN_PACKET);
+        if (decodingErrorHandler)
+            decodingErrorHandler(kDCC_ERR_UNKNOWN_PACKET);
         return;
     }
 
@@ -373,46 +325,46 @@ void DCCdecoder::ProcessAccPacket()
         switch (accType)
         {
         case BASIC:
-            if (func_BasicAccPacket)
+            if (basicAccHandler)
                 // Call BasicAccHandler                             Activate bit     last data bit of packet 2
-                func_BasicAccPacket(boardAddress, outputAddress, (packet[1] & 0x08)>>3, (packet[1] & 0x01));
+                basicAccHandler(boardAddress, outputAddress, (packet[1] & 0x08)>>3, (packet[1] & 0x01));
             break;
         case EXTENDED:
-            if (func_ExtdAccPacket)
+            if (extendedAccHandler)
                 // Call ExtAccHandler                               data bits
-                func_ExtdAccPacket(boardAddress, outputAddress, packet[2] & 0x1F);
+                extendedAccHandler(boardAddress, outputAddress, packet[2] & 0x1F);
             break;
         case BASICPOM:
-            if (func_BasicAccPomPacket)
+            if (basicAccPomHandler)
             {
                 byte instType = (packet[2] & 0x0C)>>2;   // instruction type
                 int cv = ((packet[2] & 0x03) << 8) + packet[3] + 1;   // cv 10 bit address, add one for zero index
                 byte data = packet[4];
 
                 // Call Basic Acc Pom Handler
-                func_BasicAccPomPacket(boardAddress, outputAddress, instType, cv, data);
+                basicAccPomHandler(boardAddress, outputAddress, instType, cv, data);
             }
             break;
         case EXTENDEDPOM:
-            if (func_ExtdAccPomPacket)
+            if (extAccPomHandler)
             {
                 byte instType = (packet[2] & 0x0C)>>2;   // instruction type
                 int cv = ((packet[2] & 0x03) << 8) + packet[3] + 1;   // cv 10 bit address, add one for zero index
                 byte data = packet[4];
 
                 // Call Ext Acc Pom Handler
-                func_ExtdAccPomPacket(boardAddress, outputAddress, instType, cv, data);
+                extAccPomHandler(boardAddress, outputAddress, instType, cv, data);
             }
             break;
         case LEGACYPOM:
-            if (func_LegacyAccPomPacket)
+            if (legacyAccPomHandler)
             {
                 byte instType = 0;   // no instruction type for legacy packets
                 int cv = ((packet[1] & 0x03) << 8) + packet[2] + 1;   // cv 10 bit address, add one for zero index
                 byte data = packet[3];
 
                 // Call Legacy Acc Pom Handler
-                func_LegacyAccPomPacket(boardAddress, outputAddress, instType, cv, data);
+                legacyAccPomHandler(boardAddress, outputAddress, instType, cv, data);
             }
             break;
 

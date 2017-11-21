@@ -106,12 +106,12 @@ public:
     };
 
     // callback function typedefs
-    typedef void (*IdleResetPacket)(byte byteCount, byte* packetBytes);
-    typedef void (*BaselineControlPacket)(int address, int speed, int direction);
-    typedef void (*BasicAccDecoderPacket)(int boardAddress, int outputAddress, byte activate, byte data);
-    typedef void (*ExtendedAccDecoderPacket)(int boardAddress, int outputAddress, byte data);
-    typedef void (*AccDecoderPomPacket)(int boardAddress,int outputAddress, byte instructionType, int cv, byte data);
-    typedef void (*CVUpdateCallback)(int CV, byte oldValue, byte newValue);
+    typedef void (*IdleResetHandler)(byte byteCount, byte* packetBytes);
+    typedef void (*BasicControlHandler)(int address, int speed, int direction);
+    typedef void (*BasicAccHandler)(int boardAddress, int outputAddress, byte activate, byte data);
+    typedef void (*ExtendedAccHandler)(int boardAddress, int outputAddress, byte data);
+    typedef void (*AccPomHandler)(int boardAddress,int outputAddress, byte instructionType, int cv, byte data);
+    typedef void (*CVUpdateHandler)(int CV, byte oldValue, byte newValue);
     typedef void (*DecodingErrorHandler)(byte ErrorCode);
 
     // Basic decoder setup (manufacturer ID, CV29 config, all packets option)
@@ -122,27 +122,21 @@ public:
     // process an incoming packet
     void ProcessPacket(byte *packetData, byte packetSize);
 
-    // S 9.2 defines two special packets. Idle and reset.
-    void SetIdlePacketHandler(IdleResetPacket func);
-    void SetResetPacketHandler(IdleResetPacket func);
-
-    // Handler for S 9.2 baseline packets. Speed value will be 1-14, 1-28, kDCC_STOP_SPEED or kDCC_ESTOP_SPEED
-    void SetBaselineControlPacketHandler(BaselineControlPacket func);
-
-    // Handler for RP 9.2.1 Accessory Decoders.
-    void SetBasicAccessoryDecoderPacketHandler(BasicAccDecoderPacket func);
-    void SetBasicAccessoryPomPacketHandler(AccDecoderPomPacket func);
-    void SetExtendedAccessoryDecoderPacketHandler(ExtendedAccDecoderPacket func);
-    void SetExtendedAccessoryPomPacketHandler(AccDecoderPomPacket func);
-    void SetLegacyAccessoryPomPacketHandler(AccDecoderPomPacket func);
-
-    // Error handler
-    void SetDecodingErrorHandler(DecodingErrorHandler func);
+    // set packet and other event handlers
+    void SetIdlePacketHandler(IdleResetHandler handler);
+    void SetResetPacketHandler(IdleResetHandler handler);
+    void SetBaselineControlPacketHandler(BasicControlHandler handler);
+    void SetBasicAccessoryDecoderPacketHandler(BasicAccHandler handler);
+    void SetBasicAccessoryPomPacketHandler(AccPomHandler handler);
+    void SetExtendedAccessoryDecoderPacketHandler(ExtendedAccHandler handler);
+    void SetExtendedAccessoryPomPacketHandler(AccPomHandler handler);
+    void SetLegacyAccessoryPomPacketHandler(AccPomHandler handler);
+    void SetDecodingErrorHandler(DecodingErrorHandler handler);
+    void SetCVUpdateHandler(CVUpdateHandler handler);
 
     // Read/Write CVs
     byte GetCV(int cv);
     boolean SetCV(int cv, byte newValue);
-    void SetCVUpdateHandler(CVUpdateCallback func);
     boolean CVIsValidForWrite(int cv);
 
     // Helper function to read decoder address
@@ -227,17 +221,17 @@ private:
     void ProcessAccPacket();
 
     // Function pointers for the library callbacks
-    IdleResetPacket          func_IdlePacket = 0;
-    IdleResetPacket          func_ResetPacket = 0;
-    BasicAccDecoderPacket    func_BasicAccPacket = 0;
-    AccDecoderPomPacket      func_BasicAccPomPacket = 0;
-    ExtendedAccDecoderPacket func_ExtdAccPacket = 0;
-    AccDecoderPomPacket      func_ExtdAccPomPacket = 0;
-    AccDecoderPomPacket      func_LegacyAccPomPacket = 0;
-    BaselineControlPacket    func_BaselineControlPacket = 0;
+    IdleResetHandler idleHandler = 0;
+    IdleResetHandler resetHandler = 0;
+    BasicAccHandler	basicAccHandler = 0;
+    AccPomHandler basicAccPomHandler = 0;
+    ExtendedAccHandler extendedAccHandler = 0;
+    AccPomHandler extAccPomHandler = 0;
+    AccPomHandler legacyAccPomHandler = 0;
+    BasicControlHandler basicControlHandler = 0;
 
-    DecodingErrorHandler     func_DecodingErrorHandler = 0;
-    CVUpdateCallback         func_CVUpdateCallback = 0;
+    DecodingErrorHandler decodingErrorHandler = 0;
+    CVUpdateHandler cvUpdateHandler = 0;
 };
 
 #endif
