@@ -1,4 +1,45 @@
-// TurnoutBase.h
+
+/*
+
+TurnoutBase
+
+A class providing common funtionality for the TurnoutMgr and XoverMgr classes.
+
+Summary:
+
+The TurnoutBase class provides common funtionality for the TurnoutMgr and XoverMgr classes. It handles 
+the processing of received DCC commands, controls the LED indications, controls the aux outputs, and 
+monitors the pushbutton. It contains the hardware pin assignments for all the I/O, as well as the
+definition and defaults for the CVs. A reset to default may be performed by holding the pushbutton
+while the hardware is powered up. Options to swap the interpretation of the DCC command, the occupancy 
+sensors, and the relays are provided. Two auxiliary outputs are controllable using extended accessory
+(signal aspect) commands.
+
+Details:
+
+DCC command processing takes place as follows. The raw bitstream is captured by the BitStream
+object. When 32 bits have been captured, a callback to the packet decoder begins the assembly
+of the DCC packet. After the packet decoder has assembled and checksummed a complete packet, a
+callback to the DCCdecoder initiates processing of the packet. Callbacks from the DCCdecoder
+trigger actions for normal accessory decoder packets, extended accessory decoder packets, and 
+programming on main packets.
+
+The InitMain method performs the setup for the class, including setting up the DCC packet 
+processor, reading the stored configuration from EEPROM (via the DCCdecoder lib), and getting 
+the stored position of the turnout.
+
+The Update method processes timestamps received by the BitStream object, which then sends them 
+to the DCCpacket object to be assembled into a full DCC packet. It also handles millis-related 
+updates for the LED, sensors, and timers. Packet error count per second is also checked. If it 
+exceeds a configurable max value, a reset of the bitstream object takes place.
+
+The DCCExtCommandHandler processes an extended accessory command, using signal aspects for turning 
+the two auxilliary outputs on and off. It also provides the capability to toggle error indication on
+and off. The DCCPomHandler method processes a program on main packet. It checks for a valid CV, 
+stores the data via the DCCdecoder object, and then re-reads the basic configuration for the turnout. 
+It also provides complete and partial reset via POM commands.
+
+*/
 
 #ifndef _TURNOUTBASE_h
 #define _TURNOUTBASE_h
@@ -62,7 +103,7 @@ protected:
 	// DCC bitstream and packet processors
 	BitStream bitStream;
 	DCCpacket dccPacket{ true, true, 250 };
-	DCCdecoder dcc{};
+	DCCdecoder dcc;
 
 	// bitstream and packet builder related
 	unsigned long bitErrorCount = 0;
