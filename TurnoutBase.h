@@ -26,13 +26,13 @@ protected:
 	// Hardware assignments
 	const byte Aux1Pin = 0;
 	const byte Aux2Pin = 1;
-	//const byte HWirqPin = 2;
+	//const byte HWirqPin = 2;       set in bitstream.h
 	const byte ButtonPin = 3;
 	const byte ServoPowerPin = 4;
 	const byte Servo1Pin = 5;
 	const byte LedBPin = 6;
 	const byte LedRPin = 7;
-	//const byte ICRPin = 8;
+	//const byte ICRPin = 8;         set in bitstream.h
 	const byte Servo2Pin = 9;
 	const byte Servo3Pin = 10;
 	const byte Servo4Pin = 11;
@@ -50,19 +50,19 @@ protected:
 	void FactoryReset(bool HardReset);
 
 	// Sensors and outputs
-	Button button;
-	RgbLed led;
-	OutputPin servoPower;
-	OutputPin auxOutput1;
-	OutputPin auxOutput2;
+	Button button{ ButtonPin, true };
+	RgbLed led{ LedRPin, LedGPin, LedBPin };
+	OutputPin servoPower{ ServoPowerPin };
+	OutputPin auxOutput1{ Aux1Pin };
+	OutputPin auxOutput2{ Aux2Pin };
 	EventTimer resetTimer;
 	EventTimer errorTimer;
 	EventTimer servoTimer;
 
 	// DCC bitstream and packet processors
 	BitStream bitStream;
-	DCCpacket dccPacket;
-	DCCdecoder dcc;
+	DCCpacket dccPacket{ true, true, 250 };
+	DCCdecoder dcc{};
 
 	// bitstream and packet builder related
 	unsigned long bitErrorCount = 0;
@@ -151,7 +151,6 @@ protected:
 	// event handlers
 	void DCCExtCommandHandler(unsigned int Addr, unsigned int Data);
 	void DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value);
-	void ResetTimerHandler();
 	void ErrorTimerHandler();
 };
 

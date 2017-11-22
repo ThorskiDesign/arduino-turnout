@@ -157,6 +157,15 @@ void XoverMgr::EndServoMove()
 // Event Handlers
 
 
+// handle the reset timer callback
+void XoverMgr::ResetTimerHandler()
+{
+	// run the main init after the reset timer expires
+	factoryReset = false;
+	InitMain();
+}
+
+
 // do things after the servo finishes moving to its new position
 void XoverMgr::ServoMoveDoneHandler()
 {

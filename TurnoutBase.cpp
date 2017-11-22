@@ -9,15 +9,7 @@
 
 
 // TurnoutMgr constructor
-TurnoutBase::TurnoutBase() :
-	button(ButtonPin, true),
-	led(LedRPin, LedGPin, LedBPin),
-	servoPower(ServoPowerPin),
-	auxOutput1(Aux1Pin),
-	auxOutput2(Aux2Pin),
-	bitStream(),
-	dccPacket(true, true, 250),                         // DCC packet builder
-	dcc()                                               // DCC packet processor
+TurnoutBase::TurnoutBase()
 {
 }
 
@@ -117,9 +109,9 @@ void TurnoutBase::FactoryReset(bool HardReset)
 #endif
 
 	factoryReset = true;    // set flag indicating we are in reset
-	const unsigned long resetDelay = 2500;  // time to flash led so we have indication of reset occuring
 
-									  // normal initilization will resume after this timer expires
+	// normal initilization will resume after this timer expires
+	const unsigned long resetDelay = 2500;  // time to flash led so we have indication of reset occuring
 	resetTimer.StartTimer(resetDelay);
 	led.SetLED(RgbLed::MAGENTA, RgbLed::FLASH);
 
@@ -130,7 +122,7 @@ void TurnoutBase::FactoryReset(bool HardReset)
 	bitErrorCount = 0;
 	packetErrorCount = 0;
 	lastMillis = 0;
-	showErrorIndication = true;
+	showErrorIndication = false;
 
 	// do the cv reset
 	const unsigned int numCVs = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
@@ -149,15 +141,6 @@ void TurnoutBase::FactoryReset(bool HardReset)
 
 // ========================================================================================================
 // Event Handlers
-
-
-// handle the reset timer callback
-void TurnoutBase::ResetTimerHandler()
-{
-	// run the main init after the reset timer expires
-	factoryReset = false;
-	InitMain();
-}
 
 
 // handle the error timer callback

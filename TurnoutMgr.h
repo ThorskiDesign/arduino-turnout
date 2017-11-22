@@ -109,6 +109,7 @@ private:
 	};
 
 	// event handlers
+	void ResetTimerHandler();
 	void ServoMoveDoneHandler();
 	void ButtonEventHandler(bool ButtonState);
 	void OSStraightHandler(bool ButtonState);

@@ -137,11 +137,11 @@ void TurnoutMgr::EndServoMove()
 	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::ON);
 
 	// turn off servo power
-	//servoPower.SetPin(LOW);
+	servoPower.SetPin(LOW);
 
 	// stop pwm all servos
-	//for (byte i = 0; i < numServos; i++)
-	//	servo[i].StopPWM();
+	for (byte i = 0; i < numServos; i++)
+		servo[i].StopPWM();
 
 	// enable the appropriate relay, swapping if needed
 	if ((position == STRAIGHT && !relaySwap) || (position == CURVED && relaySwap))
@@ -163,6 +163,15 @@ void TurnoutMgr::EndServoMove()
 
 // ========================================================================================================
 // Event Handlers
+
+
+// handle the reset timer callback
+void TurnoutMgr::ResetTimerHandler()
+{
+	// run the main init after the reset timer expires
+	factoryReset = false;
+	InitMain();
+}
 
 
 // do things after the servo finishes moving to its new position

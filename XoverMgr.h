@@ -48,6 +48,7 @@ private:
 	};
 
 	// event handlers
+	void ResetTimerHandler();
 	void ServoMoveDoneHandler();
 	void ButtonEventHandler(bool ButtonState);
 	void OSABHandler(bool ButtonState);
