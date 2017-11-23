@@ -48,6 +48,11 @@ void XoverMgr::Initialize()
 	// check for button hold on startup (for reset to defaults)
 	if (button.RawState() == LOW)
 	{
+		// disable button/occupancy sensor handlers
+		button.SetButtonPressHandler(0);
+		osAB.SetButtonPressHandler(0);
+		osCD.SetButtonPressHandler(0);
+
 		FactoryReset(true);    // perform a complete reset
 	}
 	else
@@ -160,6 +165,11 @@ void XoverMgr::EndServoMove()
 // handle the reset timer callback
 void XoverMgr::ResetTimerHandler()
 {
+	// enable button/occupancy sensor handlers
+	button.SetButtonPressHandler(WrapperButtonPress);
+	osAB.SetButtonPressHandler(WrapperOSAB);
+	osCD.SetButtonPressHandler(WrapperOSCD);
+
 	// run the main init after the reset timer expires
 	factoryReset = false;
 	InitMain();

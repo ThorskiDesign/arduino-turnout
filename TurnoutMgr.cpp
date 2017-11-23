@@ -49,6 +49,11 @@ void TurnoutMgr::Initialize()
 	// check for button hold on startup (for reset to defaults)
 	if (button.RawState() == LOW)
 	{
+		// disable button/occupancy sensor handlers
+		button.SetButtonPressHandler(0);
+		osStraight.SetButtonPressHandler(0);
+		osCurved.SetButtonPressHandler(0);
+
 		FactoryReset(true);    // perform a complete reset
 	}
 	else
@@ -168,6 +173,11 @@ void TurnoutMgr::EndServoMove()
 // handle the reset timer callback
 void TurnoutMgr::ResetTimerHandler()
 {
+	// enable button/occupancy sensor handlers
+	button.SetButtonPressHandler(WrapperButtonPress);
+	osStraight.SetButtonPressHandler(WrapperOSStraight);
+	osCurved.SetButtonPressHandler(WrapperOSCurved);
+
 	// run the main init after the reset timer expires
 	factoryReset = false;
 	InitMain();
