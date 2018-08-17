@@ -1,12 +1,37 @@
 
 Arduino Turnout
 
-A set of libraries for managing the operation of a DCC controlled, servo actuated model railroad 
-turnout.
+This software is part of a larger project including electrical and mechanical components for the 
+DCC control of a model railroad turnout. The completed assembly includes a custom built printed 
+circuit board providing the electrical interface for the Arduino, a 3D printed enclosure, and the 
+mechanical linkages to drive the turnout. The assembled turnout with the decoder on it is both 
+powered and controlled by the DCC signal from the track, and requires no additional wiring.
 
-Overview
+The completed design has the following features:
+   •	Powered and controlled by DCC directly from the track, with no additional wiring - completely 
+      plug and play
+   •	Operation configurable via CVs
+   •	Software upgradeable in place
+   •	Controllable via accessory commands for normal turnout operation
+   •	Controllable via signal aspect commands for external outputs and optional functions
+   •	Non-derail sensors (contact or optical) automatically throw the turnout for trains approaching 
+      from the wrong direction
+   •	Two solid state relays for powering or grounding switch rails as needed
+   •	RGB LED for status indication
+   •	Manual control via pushbutton on enclosure
+   •	1.5A switching power supply powers the board, servos, and externally accessible 5V output
+   •	Two external controllable outputs for lighting or other accessories
+   •	Supports up to four servos for complete crossover control
+   •	Servos are powered off when not in use
+   •	Two servo speeds, slow for normal operation and fast for non-derail
 
-The software design consists of three main components � the DCC decoding, the hardware 
+A pdf describing the entire project is available at:
+http://thorski.com/wp-content/uploads/2017/11/Arduino-Turnout.pdf
+
+
+Software Overview
+
+The software design consists of three main components – the DCC decoding, the hardware 
 input/output, and the overall management of the turnout. The following sections provide an 
 overview of each of the classes and describe their interaction. Detailed descriptions and 
 example usages are provided in the header comments for each class.
@@ -30,7 +55,7 @@ parsing out the DCC address, and extracting the packet data. Callbacks for the v
 types provide the data to upstream classes.
 
 The only part of the DCC decoding process that happens in an ISR is adding the pulse timer 
-count to the queue � all other bitstream processing and packet decoding takes place as a normal 
+count to the queue – all other bitstream processing and packet decoding takes place as a normal 
 process outside the ISR, significantly easing the constraints on processing time for the packet 
 building, decoding, and other functions. The packet building and decoding may in fact be 
 interrupted by the bitstream ISR if they run long, without the risk of missing a bit or 
