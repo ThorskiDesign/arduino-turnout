@@ -164,7 +164,7 @@ void TurnoutServo::ComputeSteps()
     for (int i=0; i<numSteps; i++)
     {
         int movementRange = extent[1] - extent[0];              // total range of movement
-        int increment = ((float)(i+1)/numSteps)*movementRange;  // increment for each step (force floating point division)
+		int increment = ((i + 1)*movementRange) / numSteps;     // increment for each step
         steps[0][i] = extent[1]-increment;                      // steps going from high to low
         steps[1][i] = extent[0]+increment;                      // steps going from low to high
 
