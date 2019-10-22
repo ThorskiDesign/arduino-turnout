@@ -50,9 +50,7 @@ static unsigned long lastMillis = millis();
 // Bitstream setup ==========================================================================
 
 // global stuff
-const byte intPin = 8;
-//BitStream bitStream(intPin, false, true, 52, 64, 90, 10000, 10);
-BitStream bitStream(intPin, false);
+BitStream bitStream;
 DCCpacket dccpacket(true, false, 100);
 
 

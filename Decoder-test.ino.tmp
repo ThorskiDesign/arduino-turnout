@@ -28,9 +28,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 // Bitstream setup ==========================================================================
 
 // global stuff
-const byte intPin = 8;
-//BitStream bitStream(intPin, false, false, 48, 68, 88, 10000, 10);
-BitStream bitStream(intPin, false);
+BitStream bitStream;
 DCCpacket dccpacket(true, true, 250);
 DCCdecoder dcc;
 

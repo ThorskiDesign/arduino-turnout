@@ -24,12 +24,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
 // global stuff
-//const byte intPin = 2;   // for h/w irq
-const byte intPin = 8;   // for icr
-BitStream bitStream(intPin, false);
-//BitStream bitStream(intPin, false, false);
-//BitStream bitStream(intPin, false, false, 48, 68, 88, 10000, 0);
-
+BitStream bitStream;
 boolean haveNewBits = false;
 boolean currentBit = 0;
 volatile unsigned long bits = 0;
@@ -61,7 +56,7 @@ void setup()
     pinMode(0, OUTPUT);
 	pinMode(1, OUTPUT);
 
-    //Serial.begin(115200);
+    Serial.begin(115200);
 
     bitStream.SetDataFullHandler(&BitStreamHandler);
     bitStream.SetErrorHandler(&BitErrorHandler);
