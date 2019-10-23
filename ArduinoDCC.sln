@@ -1,0 +1,64 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.852
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DCCdecoder", "DCCdecoder\DCCdecoder.vcxitems", "{D37241A3-8830-420E-B1ED-E12ECC374072}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Decoder-test", "Decoder-test\Decoder-test.vcxproj", "{738749AE-E647-48AE-8AB0-3924039EE46F}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TurnoutLibs", "TurnoutLibs\TurnoutLibs.vcxitems", "{CC6DFD6E-C8A3-4672-B882-CFA7B5A6918B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Turnout", "Turnout\Turnout.vcxproj", "{5499BC36-5DE3-4166-B157-44140114F299}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Xover", "Xover\Xover.vcxproj", "{7D496680-F1B8-43F0-8B6A-E927F922DC15}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Bitstream-test", "Bitstream-test\Bitstream-test.vcxproj", "{9133B2AB-915E-4C35-B94B-320A8A38EF94}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Packet-test", "Packet-test\Packet-test.vcxproj", "{7BD72989-CAD1-484F-A095-08E36F3875CC}"
+EndProject
+Global
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		DCCdecoder\DCCdecoder.vcxitems*{5499bc36-5de3-4166-b157-44140114f299}*SharedItemsImports = 4
+		TurnoutLibs\TurnoutLibs.vcxitems*{5499bc36-5de3-4166-b157-44140114f299}*SharedItemsImports = 4
+		DCCdecoder\DCCdecoder.vcxitems*{738749ae-e647-48ae-8ab0-3924039ee46f}*SharedItemsImports = 4
+		DCCdecoder\DCCdecoder.vcxitems*{7bd72989-cad1-484f-a095-08e36f3875cc}*SharedItemsImports = 4
+		DCCdecoder\DCCdecoder.vcxitems*{7d496680-f1b8-43f0-8b6a-e927f922dc15}*SharedItemsImports = 4
+		TurnoutLibs\TurnoutLibs.vcxitems*{7d496680-f1b8-43f0-8b6a-e927f922dc15}*SharedItemsImports = 4
+		DCCdecoder\DCCdecoder.vcxitems*{9133b2ab-915e-4c35-b94b-320a8a38ef94}*SharedItemsImports = 4
+		TurnoutLibs\TurnoutLibs.vcxitems*{cc6dfd6e-c8a3-4672-b882-cfa7b5a6918b}*SharedItemsImports = 9
+		DCCdecoder\DCCdecoder.vcxitems*{d37241a3-8830-420e-b1ed-e12ecc374072}*SharedItemsImports = 9
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{738749AE-E647-48AE-8AB0-3924039EE46F}.Debug|x86.ActiveCfg = Debug|Win32
+		{738749AE-E647-48AE-8AB0-3924039EE46F}.Debug|x86.Build.0 = Debug|Win32
+		{738749AE-E647-48AE-8AB0-3924039EE46F}.Release|x86.ActiveCfg = Release|Win32
+		{738749AE-E647-48AE-8AB0-3924039EE46F}.Release|x86.Build.0 = Release|Win32
+		{5499BC36-5DE3-4166-B157-44140114F299}.Debug|x86.ActiveCfg = Debug|Win32
+		{5499BC36-5DE3-4166-B157-44140114F299}.Debug|x86.Build.0 = Debug|Win32
+		{5499BC36-5DE3-4166-B157-44140114F299}.Release|x86.ActiveCfg = Release|Win32
+		{5499BC36-5DE3-4166-B157-44140114F299}.Release|x86.Build.0 = Release|Win32
+		{7D496680-F1B8-43F0-8B6A-E927F922DC15}.Debug|x86.ActiveCfg = Debug|Win32
+		{7D496680-F1B8-43F0-8B6A-E927F922DC15}.Debug|x86.Build.0 = Debug|Win32
+		{7D496680-F1B8-43F0-8B6A-E927F922DC15}.Release|x86.ActiveCfg = Release|Win32
+		{7D496680-F1B8-43F0-8B6A-E927F922DC15}.Release|x86.Build.0 = Release|Win32
+		{9133B2AB-915E-4C35-B94B-320A8A38EF94}.Debug|x86.ActiveCfg = Debug|Win32
+		{9133B2AB-915E-4C35-B94B-320A8A38EF94}.Debug|x86.Build.0 = Debug|Win32
+		{9133B2AB-915E-4C35-B94B-320A8A38EF94}.Release|x86.ActiveCfg = Release|Win32
+		{9133B2AB-915E-4C35-B94B-320A8A38EF94}.Release|x86.Build.0 = Release|Win32
+		{7BD72989-CAD1-484F-A095-08E36F3875CC}.Debug|x86.ActiveCfg = Debug|Win32
+		{7BD72989-CAD1-484F-A095-08E36F3875CC}.Debug|x86.Build.0 = Debug|Win32
+		{7BD72989-CAD1-484F-A095-08E36F3875CC}.Release|x86.ActiveCfg = Release|Win32
+		{7BD72989-CAD1-484F-A095-08E36F3875CC}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A47450F0-2DB0-4552-9C18-213516113065}
+	EndGlobalSection
+EndGlobal

@@ -3,4 +3,13 @@
 ################################################################################
 
 /.vs
-/CppProperties.json
+__vm
+
+[Bb]in
+[Dd]ebug*/
+[Rr]elease*/
+
+*.json
+*.filters
+*.user
+arduino folders read me.txt

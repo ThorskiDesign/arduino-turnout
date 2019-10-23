@@ -18,10 +18,9 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 */
 
+
 #include "DCCpacket.h"
 #include "Bitstream.h"
-#include <EEPROM.h>
-#include <Servo.h>
 #include "DCCdecoder.h"
 
 

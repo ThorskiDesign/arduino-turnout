@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <ItemsProjectGuid>{d37241a3-8830-420e-b1ed-e12ecc374072}</ItemsProjectGuid>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(MSBuildThisFileDirectory)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectCapability Include="SourceItemsFromImports" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="$(MSBuildThisFileDirectory)readme.txt" />
+    <Text Include="$(MSBuildThisFileDirectory)library.properties" />
+    <Text Include="$(MSBuildThisFileDirectory)src\DCCdecoder.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- <ClInclude Include="$(MSBuildThisFileDirectory)DCCdecoder.h" /> -->
+    <ClInclude Include="$(MSBuildThisFileDirectory)src\Bitstream.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)src\DCCpacket.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)src\SimpleQueue.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)src\Bitstream.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)src\DCCdecoder.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)src\DCCpacket.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)src\SimpleQueue.cpp" />
+  </ItemGroup>
+</Project>

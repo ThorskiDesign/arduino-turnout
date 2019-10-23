@@ -18,13 +18,11 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-#include <EEPROM.h>
-#include <Servo.h>
-#include "TurnoutMgr.h"
+
 #include "XoverMgr.h"
 
 
-TurnoutMgr TurnoutManager;
+XoverMgr TurnoutManager;
 
 
 void setup()
