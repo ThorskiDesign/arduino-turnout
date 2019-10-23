@@ -17,6 +17,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Bitstream-test", "Bitstream
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Packet-test", "Packet-test\Packet-test.vcxproj", "{7BD72989-CAD1-484F-A095-08E36F3875CC}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Turntable", "Turntable\Turntable.vcxproj", "{C5F80730-F44F-4478-BDAE-6634EFC2CA88}"
+EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		DCCdecoder\DCCdecoder.vcxitems*{5499bc36-5de3-4166-b157-44140114f299}*SharedItemsImports = 4
@@ -26,6 +28,8 @@ Global
 		DCCdecoder\DCCdecoder.vcxitems*{7d496680-f1b8-43f0-8b6a-e927f922dc15}*SharedItemsImports = 4
 		TurnoutLibs\TurnoutLibs.vcxitems*{7d496680-f1b8-43f0-8b6a-e927f922dc15}*SharedItemsImports = 4
 		DCCdecoder\DCCdecoder.vcxitems*{9133b2ab-915e-4c35-b94b-320a8a38ef94}*SharedItemsImports = 4
+		DCCdecoder\DCCdecoder.vcxitems*{c5f80730-f44f-4478-bdae-6634efc2ca88}*SharedItemsImports = 4
+		TurnoutLibs\TurnoutLibs.vcxitems*{c5f80730-f44f-4478-bdae-6634efc2ca88}*SharedItemsImports = 4
 		TurnoutLibs\TurnoutLibs.vcxitems*{cc6dfd6e-c8a3-4672-b882-cfa7b5a6918b}*SharedItemsImports = 9
 		DCCdecoder\DCCdecoder.vcxitems*{d37241a3-8830-420e-b1ed-e12ecc374072}*SharedItemsImports = 9
 	EndGlobalSection
@@ -54,6 +58,10 @@ Global
 		{7BD72989-CAD1-484F-A095-08E36F3875CC}.Debug|x86.Build.0 = Debug|Win32
 		{7BD72989-CAD1-484F-A095-08E36F3875CC}.Release|x86.ActiveCfg = Release|Win32
 		{7BD72989-CAD1-484F-A095-08E36F3875CC}.Release|x86.Build.0 = Release|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x86.ActiveCfg = Debug|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x86.Build.0 = Debug|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.ActiveCfg = Release|Win32
+		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
