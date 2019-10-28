@@ -26,34 +26,19 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 // Bitstream setup ==========================================================================
 
-// global stuff
-BitStream bitStream;
-DCCpacket dccpacket(true, true, 250);
 DCCdecoder dcc;
-
-
-// called when the next 32 bits from the bitstream are ready
-void BitStreamHandler(unsigned long incomingBits)
-{
-	dccpacket.ProcessIncomingBits(incomingBits);
-}
 
 
 void BitErrorHandler(byte errorCode)
 {
     //Serial.print("Bit error, code: ");
     //Serial.println(errorCode,DEC);
+
+	digitalWrite(6, HIGH); delay(100); digitalWrite(6, LOW);
 }
 
 
-// called when an assembled packet is ready
-void MainPacketHandler(byte *packetData, byte size)
-{
-	dcc.ProcessPacket(packetData, size);
-}
-
-
-void MainPacketErrorHandler(byte errorCode)
+void PacketErrorHandler(byte errorCode)
 {
     Serial.print("Packet error, code: ");
     Serial.println(errorCode,DEC);
@@ -111,7 +96,6 @@ void DCC_AccPomHandler(int boardAddress,int outputAddress, byte instructionType,
 
 
 
-
 // Setup  =================================================================
 //
 void setup()
@@ -119,24 +103,29 @@ void setup()
 	//pinMode(0, OUTPUT);
 	//pinMode(1, OUTPUT);
 
+	pinMode(6, OUTPUT);
+
+	// verify led output correct
+	digitalWrite(6, HIGH);
+	delay(1000);
+	digitalWrite(6, LOW);
+	
 	Serial.begin(115200);
-
-    bitStream.SetDataFullHandler(&BitStreamHandler);
-    bitStream.SetErrorHandler(&BitErrorHandler);
-	Serial.println("bitstream setup complete.");
-
-    dccpacket.SetPacketCompleteHandler(&MainPacketHandler);
-    dccpacket.SetPacketErrorHandler(&MainPacketErrorHandler);
-	Serial.println("packet builder setup complete.");
 
     dcc.SetupDecoder(0,0,0,true);
     dcc.SetBasicAccessoryDecoderPacketHandler(&DCC_AccessoryDecoderHandler);
     dcc.SetExtendedAccessoryDecoderPacketHandler(&DCC_ExtendedAccDecoderHandler);
     dcc.SetBaselineControlPacketHandler(&DCC_BaselineControlHandler);
     dcc.SetBasicAccessoryPomPacketHandler(&DCC_AccPomHandler);
+
+	//dcc.SetBitstreamErrorHandler(BitErrorHandler);
+	//dcc.SetPacketErrorHandler(PacketErrorHandler);
+	dcc.SetBitstreamMaxErrorHandler(BitErrorHandler);
+	//dcc.SetPacketMaxErrorHandler(PacketErrorHandler);
+	
 	Serial.println("dcc decoder setup complete.");
 
-	bitStream.Resume();    // start the bitstream capture
+	dcc.ResumeBitstream();
 	Serial.println("bitstream capture started.");
 }
 
@@ -146,5 +135,5 @@ void setup()
 
 void loop()
 {
-	bitStream.ProcessTimestamps();
+	dcc.ProcessTimeStamps();
 }

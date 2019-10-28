@@ -46,14 +46,6 @@ XoverMgr::XoverMgr()
 	dcc.SetBasicAccessoryPomPacketHandler(WrapperDCCAccPomPacket);
 	dcc.SetDecodingErrorHandler(WrapperDCCDecodingError);
 
-	// set callbacks for the bitstream capture
-	bitStream.SetDataFullHandler(WrapperBitStream);
-	bitStream.SetErrorHandler(WrapperBitStreamError);
-
-	// set callbacks for the packet builder
-	dccPacket.SetPacketCompleteHandler(WrapperDCCPacket);
-	dccPacket.SetPacketErrorHandler(WrapperDCCPacketError);
-
 	// configure timer event handlers
 	errorTimer.SetTimerHandler(WrapperErrorTimer);
 	resetTimer.SetTimerHandler(WrapperResetTimer);
@@ -131,7 +123,8 @@ void XoverMgr::BeginServoMove()
 	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
 
 	// stop the bitstream capture
-	bitStream.Suspend();
+	//bitStream.Suspend();
+	dcc.SuspendBitstream();
 
 	// turn off the relays
 	for (byte i = 0; i < numServos; i++)
@@ -170,7 +163,8 @@ void XoverMgr::EndServoMove()
 
 	// resume the bitstream capture
 	servosActive = false;
-	bitStream.Resume();
+	//bitStream.Resume();
+	dcc.ResumeBitstream();
 }
 
 
@@ -357,34 +351,9 @@ void XoverMgr::WrapperDCCDecodingError(byte errorCode)
 }
 
 
-// wrappers for callbacks in TurnoutBase ================================================================
-
-// this is called from the bitstream capture when there are 32 bits to process.
-void XoverMgr::WrapperBitStream(unsigned long incomingBits)
-{
-	currentInstance->dccPacket.ProcessIncomingBits(incomingBits);
-}
-
-void XoverMgr::WrapperBitStreamError(byte errorCode)
-{
-	currentInstance->bitErrorCount++;
-}
-
-
-// this is called by the packet builder when a complete packet is ready, to kick off the actual decoding
-void XoverMgr::WrapperDCCPacket(byte *packetData, byte size)
-{
-	// kick off the packet processor
-	currentInstance->dcc.ProcessPacket(packetData, size);
-}
-
-void XoverMgr::WrapperDCCPacketError(byte errorCode)
-{
-	currentInstance->packetErrorCount++;
-}
-
-
 // timer callback wrappers
 void XoverMgr::WrapperResetTimer() { currentInstance->ResetTimerHandler(); }
 void XoverMgr::WrapperErrorTimer() { currentInstance->ErrorTimerHandler(); }
 void XoverMgr::WrapperServoTimer() { currentInstance->EndServoMove(); }
+void XoverMgr::WrapperMaxBitErrors() { currentInstance->TurnoutBase::MaxBitErrorHandler(); }
+void XoverMgr::WrapperMaxPacketErrors() { currentInstance->TurnoutBase::MaxPacketErrorHandler(); }

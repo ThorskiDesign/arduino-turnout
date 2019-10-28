@@ -36,7 +36,7 @@ TurnoutBase::TurnoutBase()
 void TurnoutBase::Update()
 {
 	// process any DCC interrupts that have been timestamped
-	bitStream.ProcessTimestamps();
+	dcc.ProcessTimeStamps();
 
 	// do the updates to maintain flashing led and slow servo motion
 	const unsigned long currentMillis = millis();
@@ -49,43 +49,6 @@ void TurnoutBase::Update()
 
 	// update sensors
 	button.Update(currentMillis);
-
-	// check/reset error counts
-	if (currentMillis - lastMillis > 1000)
-	{
-#ifdef _DEBUG
-		Serial.print("Bit Error Count: ");
-		Serial.print(bitErrorCount, DEC);
-		Serial.print("     Packet Error Count: ");
-		Serial.println(packetErrorCount, DEC);
-#endif
-		// indicate bit errors
-		if ((bitErrorCount > maxBitErrors) && showErrorIndication)
-		{
-			// set up timer for LED indication, normal led will resume after this timer expires
-			errorTimer.StartTimer(250);
-			led.SetLED(RgbLed::YELLOW, RgbLed::ON);
-		}
-
-		// if we see repeated packet errors, reset bitstream capture
-		if (packetErrorCount > maxPacketErrors)
-		{
-			// assume we lost sync on the bitstream, reset the bitstream capture
-			bitStream.Suspend();
-			bitStream.Resume();
-
-			if (showErrorIndication)
-			{
-				// set up timer for LED indication, normal led will resume after this timer expires
-				errorTimer.StartTimer(2000);
-				led.SetLED(RgbLed::YELLOW, RgbLed::FLASH);
-			}
-		}
-
-		lastMillis = currentMillis;
-		bitErrorCount = 0;
-		packetErrorCount = 0;
-	}
 }
 
 
@@ -133,13 +96,7 @@ void TurnoutBase::FactoryReset(bool HardReset)
 	led.SetLED(RgbLed::MAGENTA, RgbLed::FLASH);
 
 	// suspend bitstream in case of soft reset
-	bitStream.Suspend();
-
-	// reset vars for soft reset
-	bitErrorCount = 0;
-	packetErrorCount = 0;
-	lastMillis = 0;
-	showErrorIndication = false;
+	dcc.SuspendBitstream();
 
 	// do the cv reset
 	const unsigned int numCVs = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
@@ -165,6 +122,24 @@ void TurnoutBase::ErrorTimerHandler()
 {
 	// all we need to do here is turn the led back on normally
 	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::ON);
+}
+
+void TurnoutBase::MaxPacketErrorHandler()
+{
+	if (!showErrorIndication) return;
+
+	// set up timer for LED indication, normal led will resume after this timer expires
+	errorTimer.StartTimer(2000);
+	led.SetLED(RgbLed::YELLOW, RgbLed::FLASH);
+}
+
+void TurnoutBase::MaxBitErrorHandler()
+{
+	if (!showErrorIndication) return;
+
+	// set up timer for LED indication, normal led will resume after this timer expires
+	errorTimer.StartTimer(250);
+	led.SetLED(RgbLed::YELLOW, RgbLed::ON);
 }
 
 

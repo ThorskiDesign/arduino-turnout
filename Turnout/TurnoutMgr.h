@@ -141,18 +141,14 @@ private:
 	static void WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byte instructionType, int cv, byte data);
 	static void WrapperDCCDecodingError(byte errorCode);
 
-	// wrappers for callbacks in TurnoutBase ================================================================
-
-	// callbacks for bitstream and packet builder
-	static void WrapperBitStream(unsigned long incomingBits);
-	static void WrapperBitStreamError(byte errorCode);
-	static void WrapperDCCPacket(byte *packetData, byte size);
-	static void WrapperDCCPacketError(byte errorCode);
-
 	// Turnout manager event handler wrappers
 	static void WrapperResetTimer();
 	static void WrapperErrorTimer();
 	static void WrapperServoTimer();
+
+	// Wrappers for events in Turnoutbase
+	static void WrapperMaxBitErrors();
+	static void WrapperMaxPacketErrors();
 };
 
 

@@ -114,9 +114,9 @@ the are received. After 32 bits have been stored, a callback is triggered, and t
 //#define TIMER1_HW_0PS    // use timer1 hardware irq with no prescaler
 //#define TIMER1_HW_8PS    // use timer1 hardware irq with 8 prescaler
 //#define TIMER1_ICR_0PS   // use timer1 input capture register with no prescaler
-//#define TIMER1_ICR_8PS   // use timer1 input capture register with 8 prescaler
-//#define TIMER2_HW_8PS    // use timer2 hardware irq with 8 prescaler
-#define TIMER2_HW_32PS   // use timer2 hardware irq with 32 prescaler
+//define TIMER1_ICR_8PS   // use timer1 input capture register with 8 prescaler
+#define TIMER2_HW_8PS    // use timer2 hardware irq with 8 prescaler
+//#define TIMER2_HW_32PS   // use timer2 hardware irq with 32 prescaler
 
 // use standard DCC timings for ICR
 #if defined(TIMER1_ICR_0PS) || defined(TIMER1_ICR_8PS)

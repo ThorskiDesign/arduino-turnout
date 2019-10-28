@@ -42,14 +42,6 @@ TurnoutMgr::TurnoutMgr()
 	dcc.SetBasicAccessoryPomPacketHandler(WrapperDCCAccPomPacket);
 	dcc.SetDecodingErrorHandler(WrapperDCCDecodingError);
 
-	// set callbacks for the bitstream capture
-	bitStream.SetDataFullHandler(WrapperBitStream);
-	bitStream.SetErrorHandler(WrapperBitStreamError);
-
-	// set callbacks for the packet builder
-	dccPacket.SetPacketCompleteHandler(WrapperDCCPacket);
-	dccPacket.SetPacketErrorHandler(WrapperDCCPacketError);
-
 	// configure timer event handlers
 	errorTimer.SetTimerHandler(WrapperErrorTimer);
 	resetTimer.SetTimerHandler(WrapperResetTimer);
@@ -134,7 +126,7 @@ void TurnoutMgr::BeginServoMove()
 	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
 
 	// stop the bitstream capture
-	bitStream.Suspend();
+	dcc.SuspendBitstream();
 
 	// turn off the relays
 	relayStraight.SetPin(LOW);
@@ -180,7 +172,7 @@ void TurnoutMgr::EndServoMove()
 
 	// resume the bitstream capture
 	servosActive = false;
-	bitStream.Resume();
+	dcc.ResumeBitstream();
 }
 
 
@@ -371,34 +363,9 @@ void TurnoutMgr::WrapperDCCDecodingError(byte errorCode)
 }
 
 
-// wrappers for callbacks in TurnoutBase ================================================================
-
-// this is called from the bitstream capture when there are 32 bits to process.
-void TurnoutMgr::WrapperBitStream(unsigned long incomingBits)
-{
-	currentInstance->dccPacket.ProcessIncomingBits(incomingBits);
-}
-
-void TurnoutMgr::WrapperBitStreamError(byte errorCode)
-{
-	currentInstance->bitErrorCount++;
-}
-
-
-// this is called by the packet builder when a complete packet is ready, to kick off the actual decoding
-void TurnoutMgr::WrapperDCCPacket(byte *packetData, byte size)
-{
-	// kick off the packet processor
-	currentInstance->dcc.ProcessPacket(packetData, size);
-}
-
-void TurnoutMgr::WrapperDCCPacketError(byte errorCode)
-{
-	currentInstance->packetErrorCount++;
-}
-
-
 // timer callback wrappers
 void TurnoutMgr::WrapperResetTimer() { currentInstance->ResetTimerHandler(); }
 void TurnoutMgr::WrapperErrorTimer() { currentInstance->ErrorTimerHandler(); }
 void TurnoutMgr::WrapperServoTimer() { currentInstance->EndServoMove(); }
+void TurnoutMgr::WrapperMaxBitErrors() { currentInstance->TurnoutBase::MaxBitErrorHandler(); }
+void TurnoutMgr::WrapperMaxPacketErrors() { currentInstance->TurnoutBase::MaxPacketErrorHandler(); }

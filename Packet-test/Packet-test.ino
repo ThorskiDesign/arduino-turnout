@@ -70,7 +70,7 @@ void BitErrorHandler(byte errorCode)
 
 // dcc packet builder setup ============================================================
 
-void MainPacketErrorHandler(byte errorCode)
+void PacketErrorHandler(byte errorCode)
 {
 	if (gErrorCount < 25)
 		gErrorLog[gErrorCount] = errorCode;
@@ -232,7 +232,7 @@ void setup()
 	bitStream.SetErrorHandler(&BitErrorHandler);
 
 	dccpacket.SetPacketCompleteHandler(&RawPacketHandler);
-	dccpacket.SetPacketErrorHandler(&MainPacketErrorHandler);
+	dccpacket.SetPacketErrorHandler(&PacketErrorHandler);
 
 	bitStream.Resume();    // start the bitstream capture
 }

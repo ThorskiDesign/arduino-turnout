@@ -19,15 +19,28 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "DCCdecoder.h"
-#include "EEPROM.h"
+
+// static pointer for callbacks
+DCCdecoder* DCCdecoder::currentInstance = 0;
 
 // Constructors
 
 DCCdecoder::DCCdecoder()
 {
+	// pointer for callback functions
+	currentInstance = this;
+	
     // packet vars
     for (int i=0; i<kPACKET_LEN_MAX; i++)
         packet[i] = 0;
+
+	// set callbacks for the bitstream capture
+	bitStream.SetDataFullHandler(WrapperBitStream);
+	bitStream.SetErrorHandler(WrapperBitStreamError);
+
+	// set callbacks for the packet builder
+	dccPacket.SetPacketCompleteHandler(WrapperDCCPacket);
+	dccPacket.SetPacketErrorHandler(WrapperDCCPacketError);
 }
 
 
@@ -128,8 +141,69 @@ void DCCdecoder::SetExtendedAccessoryPomPacketHandler(AccPomHandler handler) { e
 void DCCdecoder::SetIdlePacketHandler(IdleResetHandler handler) { idleHandler = handler; }
 void DCCdecoder::SetResetPacketHandler(IdleResetHandler handler) { resetHandler = handler; }
 
+void DCCdecoder::SetBitstreamErrorHandler(BitstreamErrorHandler handler) { bitstreamErrorHandler = handler; }
+void DCCdecoder::SetBitstreamMaxErrorHandler(BitstreamErrorHandler handler) { bitstreamMaxErrorHandler = handler; }
+void DCCdecoder::SetPacketErrorHandler(PacketErrorHandler handler) { packetErrorHandler = handler; }
+void DCCdecoder::SetPacketMaxErrorHandler(PacketErrorHandler handler) { packetMaxErrorHandler = handler; }
 void DCCdecoder::SetDecodingErrorHandler(DecodingErrorHandler handler) { decodingErrorHandler = handler; }
+
 void DCCdecoder::SetCVUpdateHandler(CVUpdateHandler handler) { cvUpdateHandler = handler; }
+
+
+// Bitstream control  ==========================================================================
+
+void DCCdecoder::ProcessTimeStamps()
+{
+	// process the timestamps in the bitstream
+	bitStream.ProcessTimestamps();
+
+	// check/reset error counts
+	const unsigned long currentMillis = millis();
+	if (currentMillis - lastMillis > 1000)
+	{
+		
+#ifdef _DEBUG
+		Serial.print("Bit Error Count: ");
+		Serial.print(bitErrorCount, DEC);
+		Serial.print("     Packet Error Count: ");
+		Serial.println(packetErrorCount, DEC);
+#endif
+
+		// check bit errors and raise event if necessary
+		if ((bitErrorCount > maxBitErrors) && bitstreamErrorHandler) bitstreamMaxErrorHandler(lastBitError);
+
+		// if we see repeated packet errors, reset bitstream capture
+		if (packetErrorCount > maxPacketErrors)
+		{
+			// assume we lost sync on the bitstream, reset the bitstream capture
+			bitStream.Suspend();
+			bitStream.Resume();
+
+			// raise packet error event
+			if (packetErrorHandler) packetMaxErrorHandler(lastPacketError);
+		}
+
+		lastMillis = currentMillis;
+		bitErrorCount = 0;
+		packetErrorCount = 0;
+	}
+}
+
+void DCCdecoder::SuspendBitstream()
+{
+	bitStream.Suspend();
+}
+
+void DCCdecoder::ResumeBitstream()
+{
+	// reset error counts
+	bitErrorCount = 0;
+	packetErrorCount = 0;
+	lastMillis = 0;
+
+	bitStream.Resume();
+}
+
 
 
 // Packet processing   =========================================================================
@@ -389,4 +463,46 @@ void DCCdecoder::ProcessAccPacket()
 
         }    // end switch
     }     // end if
+}
+
+
+void DCCdecoder::BitStreamError(byte errorCode)
+{
+	bitErrorCount++;
+	lastBitError = errorCode;
+	if (bitstreamErrorHandler) bitstreamErrorHandler(errorCode);
+}
+
+void DCCdecoder::PacketError(byte errorCode)
+{
+	packetErrorCount++;
+	lastPacketError = errorCode;
+	if (packetErrorHandler) packetErrorHandler(errorCode);
+}
+
+
+// wrappers for callbacks in bitstream and packet objects ===================================================
+
+// this is called from the bitstream capture when there are 32 bits to process.
+void DCCdecoder::WrapperBitStream(unsigned long incomingBits)
+{
+	currentInstance->dccPacket.ProcessIncomingBits(incomingBits);
+}
+
+void DCCdecoder::WrapperBitStreamError(byte errorCode)
+{
+	currentInstance->BitStreamError(errorCode);
+}
+
+
+// this is called by the packet builder when a complete packet is ready, to kick off the actual decoding
+void DCCdecoder::WrapperDCCPacket(byte *packetData, byte size)
+{
+	// kick off the packet processor
+	currentInstance->ProcessPacket(packetData, size);
+}
+
+void DCCdecoder::WrapperDCCPacketError(byte errorCode)
+{
+	currentInstance->PacketError(errorCode);
 }

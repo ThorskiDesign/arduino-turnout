@@ -65,6 +65,10 @@ TODO: The library currently only implements the most basic locomotive functional
 */
 
 
+#include "EEPROM.h"
+#include "Bitstream.h"
+#include "DCCpacket.h"
+
 
 #ifndef _DCCDECODER_h
 #define _DCCDECODER_h
@@ -131,13 +135,33 @@ public:
     typedef void (*ExtendedAccHandler)(int boardAddress, int outputAddress, byte data);
     typedef void (*AccPomHandler)(int boardAddress,int outputAddress, byte instructionType, int cv, byte data);
     typedef void (*CVUpdateHandler)(int CV, byte oldValue, byte newValue);
-    typedef void (*DecodingErrorHandler)(byte ErrorCode);
+
+	typedef void (*BitstreamErrorHandler)(byte ErrorCode);
+	typedef void (*PacketErrorHandler)(byte ErrorCode);
+	typedef void (*DecodingErrorHandler)(byte ErrorCode);
 
     // Basic decoder setup (manufacturer ID, CV29 config, all packets option)
     DCCdecoder();
     DCCdecoder(byte mfgID, byte mfgVers, byte cv29, boolean allPackets);
     void SetupDecoder(byte mfgID, byte mfgVers, byte cv29, boolean allPackets);
 
+	// DCC bitstream and packet processors
+	BitStream bitStream;
+	DCCpacket dccPacket{ true, true, 250 };
+
+	// bitstream and packet builder related
+	unsigned long bitErrorCount = 0;
+	unsigned long packetErrorCount = 0;
+	const byte maxBitErrors = 10;         // number of bit errors before indication
+	const byte maxPacketErrors = 10;      // number of packet errors before bitstream reset
+	unsigned long lastMillis = 0;         // for tracking refresh interval for error counts
+
+    // decoder and bitstream control
+	void ProcessTimeStamps();          // call this regularly for the bitstream object to check
+	                                   // and process dcc timestamps in the queue
+	void SuspendBitstream();
+	void ResumeBitstream();
+	
     // process an incoming packet
     void ProcessPacket(byte *packetData, byte packetSize);
 
@@ -150,7 +174,13 @@ public:
     void SetExtendedAccessoryDecoderPacketHandler(ExtendedAccHandler handler);
     void SetExtendedAccessoryPomPacketHandler(AccPomHandler handler);
     void SetLegacyAccessoryPomPacketHandler(AccPomHandler handler);
-    void SetDecodingErrorHandler(DecodingErrorHandler handler);
+
+	void SetBitstreamErrorHandler(BitstreamErrorHandler handler);
+	void SetBitstreamMaxErrorHandler(BitstreamErrorHandler handler);
+	void SetPacketErrorHandler(PacketErrorHandler handler);
+	void SetPacketMaxErrorHandler(PacketErrorHandler handler);
+	void SetDecodingErrorHandler(DecodingErrorHandler handler);
+	
     void SetCVUpdateHandler(CVUpdateHandler handler);
 
     // Read/Write CVs
@@ -230,7 +260,9 @@ private:
     byte packetSize = 0;                   // the current packet size
     PacketType packetType = UNKNOWNPKT;    // the packet type
     boolean returnAllPackets = false;      // return all packets, not just the ones for the decoder's address
-
+	int lastBitError;
+	int lastPacketError;
+	
     // Packet processors
     void ProcessIdlePacket();
     void ProcessBroadcastPacket();
@@ -249,9 +281,26 @@ private:
     AccPomHandler legacyAccPomHandler = 0;
     BasicControlHandler basicControlHandler = 0;
 
-    DecodingErrorHandler decodingErrorHandler = 0;
+	BitstreamErrorHandler bitstreamErrorHandler = 0;
+	BitstreamErrorHandler bitstreamMaxErrorHandler = 0;
+	PacketErrorHandler packetErrorHandler = 0;
+	PacketErrorHandler packetMaxErrorHandler = 0;
+	DecodingErrorHandler decodingErrorHandler = 0;
+	
     CVUpdateHandler cvUpdateHandler = 0;
+
+	// error handling for bitstream and packet processing
+	void BitStreamError(byte errorCode);
+	void PacketError(byte errorCode);
+
+	// pointer to allow us to access member objects from callbacks
+	static DCCdecoder* currentInstance;
+
+	// callbacks for bitstream and packet builder
+	static void WrapperBitStream(unsigned long incomingBits);
+	static void WrapperBitStreamError(byte errorCode);
+	static void WrapperDCCPacket(byte *packetData, byte size);
+	static void WrapperDCCPacketError(byte errorCode);
 };
 
 #endif
-

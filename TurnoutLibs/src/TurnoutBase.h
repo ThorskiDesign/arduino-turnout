@@ -69,8 +69,6 @@ It also provides complete and partial reset via POM commands.
 #include "WProgram.h"
 #endif
 
-#include "Bitstream.h"
-#include "DCCpacket.h"
 #include "DCCdecoder.h"
 #include "RGB_LED.h"
 #include "Button.h"
@@ -119,17 +117,8 @@ protected:
 	EventTimer errorTimer;
 	EventTimer servoTimer;
 
-	// DCC bitstream and packet processors
-	BitStream bitStream;
-	DCCpacket dccPacket{ true, true, 250 };
+	// DCC decoder
 	DCCdecoder dcc;
-
-	// bitstream and packet builder related
-	unsigned long bitErrorCount = 0;
-	unsigned long packetErrorCount = 0;
-	const byte maxBitErrors = 10;         // number of bit errors before indication
-	const byte maxPacketErrors = 10;      // number of packet errors before bitstream reset
-	unsigned long lastMillis = 0;         // for tracking refresh interval for error counts
 
 	// other instance variables
 	enum State { STRAIGHT, CURVED };
@@ -209,9 +198,11 @@ protected:
 
 
 	// event handlers
+	void ErrorTimerHandler();
+	void MaxPacketErrorHandler();
+	void MaxBitErrorHandler();
 	void DCCExtCommandHandler(unsigned int Addr, unsigned int Data);
 	void DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value);
-	void ErrorTimerHandler();
 };
 
 #endif
