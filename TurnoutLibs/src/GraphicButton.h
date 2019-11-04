@@ -9,23 +9,10 @@
 #include "WProgram.h"
 #endif
 
-#include "SPI.h"
-#include "Adafruit_GFX.h"
+
 #include "Adafruit_ILI9341.h"
 //#include "Fonts/FreeSansBold12pt7b.h"
 
-// Color definitions from Adafruit
-#define BLACK    0x0000
-#define BLUE     0x001F
-#define RED      0xF800
-#define GREEN    0x07E0
-#define CYAN     0x07FF
-#define MAGENTA  0xF81F
-#define YELLOW   0xFFE0 
-#define WHITE    0xFFFF
-
-#define TTMENU_ON  0x059E
-#define TTMENU_OFF 0x84D6
 
 class GraphicButton
 {
@@ -44,22 +31,29 @@ public:
 		CIRCLE
 	};
 
-	GraphicButton(Adafruit_ILI9341* tft, GraphicButtonType type, GraphicButtonShape shp,
-		unsigned int xpos, unsigned int ypos, unsigned int xsize, unsigned int ysize, String lbl, byte id);
+	GraphicButton(Adafruit_ILI9341* tft, GraphicButtonType t, GraphicButtonShape shp,
+		unsigned int xp, unsigned int yp, unsigned int xs, unsigned int ys, String lbl, byte id);
 	void SetLabel(String l, bool show);
 	void SetColors(unsigned int on, unsigned int off, unsigned int text, unsigned int border);
 
 	void SetState(bool state);
 	void SetActive(bool active);
 
-	bool Press(unsigned int xpos, unsigned int ypos);   // button press and release
+	bool Press(unsigned int x, unsigned int y);   // button press and release
 	void Release();
 
 	void SetButtonHandler(void* cbObject, GraphicButtonHandler handler);
 
 
 private:
+	// Color definitions from Adafruit
+	const uint16_t black = 0x0000;
+	const uint16_t white = 0xFFFF;
+	const uint16_t ttmenuOn = 0x059E;
+	const uint16_t ttmenuOff = 0x84D6;
+
 	Adafruit_ILI9341* tftdisplay;
+	
 	GraphicButtonType type = TOGGLE;
 	GraphicButtonShape shape = ROUNDRECT;
 	unsigned int xpos = 0;
@@ -81,10 +75,10 @@ private:
 	bool btnIsPressed = false;     // is the touchscreen pressed
 	bool redrawPending = false;     // flag to skip redraw in spots if we are going to do it anyway
 
-	unsigned int onColor = TTMENU_ON;
-	unsigned int offColor = TTMENU_OFF;
-	unsigned int textColor = BLACK;
-	unsigned int borderColor = BLACK;
+	unsigned int onColor = ttmenuOn;
+	unsigned int offColor = ttmenuOff;
+	unsigned int textColor = black;
+	unsigned int borderColor = black;
 
 	void UpdateBoundingBox();  // update the bounding box for the current size and position
 	void DrawButton();         // draw the button with the current settings

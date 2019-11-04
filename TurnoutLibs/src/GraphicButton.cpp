@@ -34,25 +34,25 @@ void GraphicButton::SetColors(unsigned int on, unsigned int off, unsigned int te
 	if (!redrawPending) DrawButton();
 }
 
-void GraphicButton::SetState(bool state)
+void GraphicButton::SetState(const bool state)
 {
 	switchState = state;
 	DrawButton();
 }
 
-void GraphicButton::SetActive(bool a)
+void GraphicButton::SetActive(const bool a)
 {
 	active = a;
 	DrawButton();
 }
 
-bool GraphicButton::Press(unsigned int x, unsigned int y)
+bool GraphicButton::Press(const unsigned int x, const unsigned int y)
 {
 	if (!active) return false;
 	if (btnIsPressed) return false;
 	if (type == INDICATOR) return false;
 
-	bool inBounds = x >= xmin && x <= xmax && y >= ymin && y <= ymax;
+	const bool inBounds = x >= xmin && x <= xmax && y >= ymin && y <= ymax;
 
 	if (inBounds)
 	{
@@ -95,7 +95,7 @@ void GraphicButton::Release()
 	return;
 }
 
-void GraphicButton::SetButtonHandler(void* cbObject, GraphicButtonHandler handler)
+void GraphicButton::SetButtonHandler(void* cbObject, const GraphicButtonHandler handler)
 {
 	callbackObject = cbObject;
 	buttonHandler = handler;
@@ -103,8 +103,8 @@ void GraphicButton::SetButtonHandler(void* cbObject, GraphicButtonHandler handle
 
 void GraphicButton::UpdateBoundingBox()
 {
-	unsigned int centerx;
-	unsigned int centery;
+	unsigned int centerx = 0;
+	unsigned int centery = 0;
 
 	switch (shape)
 	{
@@ -149,7 +149,7 @@ void GraphicButton::DrawButton()
 	Serial.print("draw button: "); Serial.println(btnID);
 #endif // _DEBUG
 
-	unsigned int Color = switchState ? onColor : offColor;
+	const unsigned int Color = switchState ? onColor : offColor;
 	byte t = borderThickness;
 
 	switch (shape)
