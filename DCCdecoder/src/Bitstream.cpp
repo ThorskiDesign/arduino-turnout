@@ -248,7 +248,7 @@ void BitStream::ProcessTimestamps()
 	// generate debugging pulses on scope to monitor simpleQueue size.
 	//for (int i = 0; i < simpleQueue.Size(); i++)
 	//{
-	//	HW_DEBUG_PULSE();
+	//	HW_DEBUG_PULSE_18();
 	//}
 
 	while (simpleQueue.Size() > 0)

@@ -114,7 +114,7 @@ class DCCdecoder
 {
 public:
     // CV29 bits  (from NmraDcc.h)
-    enum CV29bits {
+    enum CV29bits : byte {
         CV29_LOCO_DIR            = 0x01, // bit 0: Locomotive Direction: "0" = normal, "1" = reversed
         CV29_F0_LOCATION         = 0x02, // bit 1: F0 location: "0" = bit 4 in Speed and Direction instructions, 
                                          //        "1" = bit 4 in function group one instruction
@@ -150,8 +150,8 @@ public:
 	DCCpacket dccPacket{ true, true, 250 };
 
 	// bitstream and packet builder related
-	unsigned long bitErrorCount = 0;
-	unsigned long packetErrorCount = 0;
+	byte bitErrorCount = 0;
+	byte packetErrorCount = 0;
 	const byte maxBitErrors = 10;         // number of bit errors before indication
 	const byte maxPacketErrors = 10;      // number of packet errors before bitstream reset
 	unsigned long lastMillis = 0;         // for tracking refresh interval for error counts
@@ -194,7 +194,7 @@ public:
 private:
 
     // DCC packet types and identifying specs
-    enum PacketType
+    enum PacketType : byte
     {
         UNKNOWNPKT,
         IDLEPKT,
@@ -208,8 +208,8 @@ private:
     struct PacketSpec
     {
         PacketType packetType;
-        unsigned long specMask;
-        unsigned long specAns;
+        byte specMask;
+        byte specAns;
     };
 
     // Order these starting with the expected most common packet types, but note dependencies
@@ -226,7 +226,7 @@ private:
     const byte numPacketTypes = sizeof(packetSpec)/sizeof(PacketSpec);
 
     // accessory packet types and specs
-    enum AccPacketType
+    enum AccPacketType : byte
     {
         UNKNOWNACC,
         BASIC,
@@ -239,18 +239,18 @@ private:
     struct AccPacketSpec
     {
         AccPacketType accPacketType;
-        unsigned long specMask;
-        unsigned long specAns;
+        uint16_t specMask;
+        uint16_t specAns;
     };
 
     // Order these starting with the expected most common packet types, but note dependencies
     const AccPacketSpec accPacketSpec[5] =
     {
-        { BASICPOM,    (0x80UL << 8) + 0xF0, (0x80UL << 8) + 0xE0 },
-        { BASIC,       (0x80UL << 8) + 0x00, (0x80UL << 8) + 0x00 },   // must follow BASICPOM
-        { EXTENDEDPOM, (0x89UL << 8) + 0xF0, (0x01UL << 8) + 0xE0 },
-        { EXTENDED,    (0x89UL << 8) + 0xE0, (0x01UL << 8) + 0x00 },   // must follow EXTENDEDPOM
-        { LEGACYPOM,   (0x8CUL << 8) + 0x00, (0x0CUL << 8) + 0x00 },
+        { BASICPOM,    (0x80U << 8) + 0xF0, (0x80U << 8) + 0xE0 },
+        { BASIC,       (0x80U << 8) + 0x00, (0x80U << 8) + 0x00 },   // must follow BASICPOM
+        { EXTENDEDPOM, (0x89U << 8) + 0xF0, (0x01U << 8) + 0xE0 },
+        { EXTENDED,    (0x89U << 8) + 0xE0, (0x01U << 8) + 0x00 },   // must follow EXTENDEDPOM
+        { LEGACYPOM,   (0x8CU << 8) + 0x00, (0x0CU << 8) + 0x00 },
     };
 
     const byte numAccPacketTypes = sizeof(accPacketSpec)/sizeof(AccPacketSpec);
@@ -260,8 +260,8 @@ private:
     byte packetSize = 0;                   // the current packet size
     PacketType packetType = UNKNOWNPKT;    // the packet type
     boolean returnAllPackets = false;      // return all packets, not just the ones for the decoder's address
-	int lastBitError;
-	int lastPacketError;
+	byte lastBitError;
+	byte lastPacketError;
 	
     // Packet processors
     void ProcessIdlePacket();

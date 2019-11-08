@@ -96,13 +96,15 @@ the are received. After 32 bits have been stored, a callback is triggered, and t
 
 
 // defines for direct port access and hardware debugging pulses
-#define HW_IRQ_PORT() PIND & 0x04                                                    // direct access h/w port pin 2
-//#define HW_DEBUG_PULSE() { PORTD = PORTD | (1 << 0); PORTD = PORTD & ~(1 << 0); }    // pulse pin 0
-//#define HW_DEBUG_PULSE_ON() PORTD = PORTD | (1 << 0)                                 // set pin 0 high
-//#define HW_DEBUG_PULSE_OFF() PORTD = PORTD & ~(1 << 0)                               // set pin 0 low
-#define HW_DEBUG_PULSE() { PORTC = PORTC | (1 << 4); PORTC = PORTC & ~(1 << 4); }    // pulse pin 18
-#define HW_DEBUG_PULSE_ON() PORTC = PORTC | (1 << 4)                                 // set pin 18 high
-#define HW_DEBUG_PULSE_OFF() PORTC = PORTC & ~(1 << 4)                               // set pin 18 low
+#define HW_IRQ_PORT() PIND & 0x04                                                       // direct access h/w port pin 2
+
+// make sure pinmode is set to output for pins 18 and 19 to use these
+#define HW_DEBUG_PULSE_18() { PORTC = PORTC | (1 << 4); PORTC = PORTC & ~(1 << 4); }    // pulse pin 18
+#define HW_DEBUG_PULSE_18_ON() PORTC = PORTC | (1 << 4)                                 // set pin 18 high
+#define HW_DEBUG_PULSE_18_OFF() PORTC = PORTC & ~(1 << 4)                               // set pin 18 low
+#define HW_DEBUG_PULSE_19() { PORTC = PORTC | (1 << 5); PORTC = PORTC & ~(1 << 5); }    // pulse pin 19
+#define HW_DEBUG_PULSE_19_ON() PORTC = PORTC | (1 << 5)                                 // set pin 19 high
+#define HW_DEBUG_PULSE_19_OFF() PORTC = PORTC & ~(1 << 5)                               // set pin 19 low
 
 #define ERR_INVALID_HALF_BIT             1
 #define ERR_INVALID_HALF_BIT_LOW         2

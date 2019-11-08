@@ -237,6 +237,12 @@ bool DCCpacket::IsRepeatPacket()
         oldEntryCount++;
     }
 
+	// hardware debug to check size of packet log
+	for (int i = 0; i < newEntryCount; i++)
+	//{
+	//	PORTC = PORTC | (1 << 4); PORTC = PORTC & ~(1 << 4);
+	//}
+
     // set size of next entry to zero to flag end of history data
     packetLog[newEntryCount].packetSize = 0;
 

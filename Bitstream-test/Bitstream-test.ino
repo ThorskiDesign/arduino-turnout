@@ -52,8 +52,8 @@ void setup()
     // put your setup code here, to run once:
 {
     // for testing timing
-    pinMode(0, OUTPUT);
-	pinMode(1, OUTPUT);
+    pinMode(18, OUTPUT);
+	pinMode(19, OUTPUT);
 
     Serial.begin(115200);
 
@@ -70,6 +70,8 @@ unsigned long lastMillis2 = 0;
 void loop()
     // put your main code here, to run repeatedly:
 {
+	//PORTC = PORTC | (1 << 5); PORTC = PORTC & ~(1 << 5);      // pulse pin 19
+
 	bitStream.ProcessTimestamps();
 
     unsigned long currentMillis = millis();

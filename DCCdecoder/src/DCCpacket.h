@@ -78,8 +78,12 @@ and its timestamp are added to the log, and the method returns false.
 #define PACKET_LEN_MIN              2   // zero indexed
 #define PACKET_LEN_MAX              5   // zero indexed
 #define PREAMBLE_MIN               10   // minimum number of 1's to signal valid preamble
-#define MAX_PACKET_LOG_SIZE        25   // max number of packets to check for repeats
+#define MAX_PACKET_LOG_SIZE        15   // max number of packets to check for repeats
+										// Note: the number of packets in the log is at least 1 for idle packets plus 1 for each engine
+										// with speed > 0, since the NCE sends them repeatedly. Did not seem to see anything over ~10-12
+										// in the log, even with 6 engines running and scrolling the thumbwheel.
 
+// error codes
 #define ERR_PACKET_TOO_LONG         1
 #define ERR_PACKET_TOO_SHORT        2
 #define ERR_FAILED_CHECKSUM         3
@@ -104,7 +108,7 @@ public:
 
 private:
     // states
-    enum State
+    enum State : byte
     {
         READPREAMBLE,
         READPACKET,
@@ -112,10 +116,10 @@ private:
 
     struct LogPacket
     {
+        unsigned long packetTime;
         byte packetSize;
         byte packetData[PACKET_LEN_MAX + 1];
-        unsigned long packetTime;
-    };
+   };
 
     // private functions
     void ReadPreamble();

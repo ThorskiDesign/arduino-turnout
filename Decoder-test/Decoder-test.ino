@@ -104,6 +104,8 @@ void setup()
 	//pinMode(1, OUTPUT);
 
 	pinMode(6, OUTPUT);
+	pinMode(18, OUTPUT);
+	pinMode(19, OUTPUT);
 
 	// verify led output correct
 	digitalWrite(6, HIGH);

@@ -49,7 +49,7 @@ static unsigned long lastMillis = millis();
 
 // global stuff
 BitStream bitStream;
-DCCpacket dccpacket(true, false, 100);
+DCCpacket dccpacket(true, true, 250);
 
 
 void BitStreamHandler(unsigned long incomingBits)
@@ -223,6 +223,7 @@ void DumpAndResetTable()
 //
 void setup()
 {
+	// for testing timing
 	pinMode(18, OUTPUT);
 	pinMode(19, OUTPUT);
 
@@ -240,19 +241,19 @@ void setup()
 
 
 // Main loop   =======================================================================
-double y = 0;
+volatile double y = 0;
 void loop()
 {
 	// add a delay doing some processing...  
-	// approx 500 us, puts 10-15 timestamps in the queue
-	//HW_DEBUG_PULSE_ON();
+	// approx 500 us, puts ~10 timestamps in the queue
+	//HW_DEBUG_PULSE_19_ON();
 	//double x;
 	//for (unsigned int i = 0; i < 4; i++)
 	//{
 	//	x += sin(i);
 	//}
 	//y = x;
-	//HW_DEBUG_PULSE_OFF();
+	//HW_DEBUG_PULSE_19_OFF();
 
 	bitStream.ProcessTimestamps();
 

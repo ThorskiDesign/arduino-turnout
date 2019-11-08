@@ -55,7 +55,11 @@ Example Usage:
 	#include "WProgram.h"
 #endif
 
-#define maxIndex 20
+
+// this value is conservatively tolerant of a ~500us delay in processing timestamps,
+// which results in about 10 entries in the queue.
+#define maxIndex 15
+
 
 class SimpleQueue
 {

@@ -37,7 +37,10 @@ void SimpleQueue::Put(unsigned int val)
 	else
 		writeIndex = 0;
 
-	queueSize++;
+	// values in the queue wrap around but only the last ones added are meaningful
+	if (queueSize < maxIndex)
+		queueSize++;
+
 	values[writeIndex] = val;
 }
 

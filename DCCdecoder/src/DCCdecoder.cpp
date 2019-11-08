@@ -31,7 +31,7 @@ DCCdecoder::DCCdecoder()
 	currentInstance = this;
 	
     // packet vars
-    for (int i=0; i<kPACKET_LEN_MAX; i++)
+    for (byte i=0; i<kPACKET_LEN_MAX; i++)
         packet[i] = 0;
 
 	// set callbacks for the bitstream capture
@@ -214,11 +214,11 @@ void DCCdecoder::ProcessPacket(byte *packetData, byte size)
 {
 	// assign params to class vars
     packetSize = size;
-    for (int i=0; i<packetSize; i++)
+    for (byte i=0; i<packetSize; i++)
         packet[i] = packetData[i];
 
     // Determine the basic packet type - loop through packet specs and check against current packet
-    int i = 0;
+    byte i = 0;
     bool packetIdentified = false;
 
     while (!packetIdentified && i < numPacketTypes )
@@ -377,10 +377,10 @@ void DCCdecoder::ProcessAccBroadcastPacket()
 void DCCdecoder::ProcessAccPacket()
 {
     // combine packet bytes for comparison against packet specs
-	const unsigned long comp = ((unsigned long)packet[1] << 8) | packet[2];
+	const uint16_t comp = ((uint16_t)packet[1] << 8) | packet[2];
 
     // loop through packet specs and check against current packet to identify it
-    int i = 0;
+    byte i = 0;
     bool packetIdentified = false;
     while (!packetIdentified && i < numAccPacketTypes )
     {
