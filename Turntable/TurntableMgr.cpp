@@ -46,32 +46,44 @@ void TurntableMgr::Initialize()
 
 	// configure buttons
 	ConfigureButtons();
+
+	// configure callbacks
+	hallSensor.SetButtonPressHandler(WrapperHallSensorHandler);
+	idleTimer.SetTimerHandler(WrapperIdleTimerHandler);
+	warmupTimer.SetTimerHandler(WrapperWarmupTimerHandler);
+
+	// start the state machine
+	if (currentState == MOVING || currentState == SEEKFAST || currentState == SEEKSLOW)
+		// we shutdown without reaching our destination, so stepper position is unknown
+	{
+		currentState = SEEKFAST;
+		stateSeekFast();
+	}
+	else
+		// normal startup
+	{
+		currentState = IDLE;
+		stateIdle();
+	}
 }
+
 
 void TurntableMgr::Update()
 {
-	if (dccIsActive[turntableMode]) dcc.ProcessTimeStamps();
-	//	if (tsIsActive[turntableMode]) 
+	// TODO: figure out a tidy way to disable things that don't need to be updated
+	//       depending on the state we're in
+
+	//dcc.ProcessTimeStamps();
 	PollTouchscreen();
-	if (stepperIsRunning[turntableMode]) accelStepper.run();
+	accelStepper.run();
+	if (currentState == MOVING && accelStepper.distanceToGo() == 0) raiseEvent(MOVE_DONE);
 
-	// need more here for end of move, etc.
-	if (accelStepper.distanceToGo() == 0)
-	{
-		turntableMode == IDLE;
-	}
-
-	//// do the updates to maintain flashing led and slow servo motion
-	//const unsigned long currentMillis = millis();
-	//led.Update(currentMillis);
-
-	//// timer updates
-	//errorTimer.Update(currentMillis);
-	//resetTimer.Update(currentMillis);
-	//servoTimer.Update(currentMillis);
-
-	//// update sensors
-	//button.Update(currentMillis);
+	// update sensors, etc. as needed
+	const unsigned long currentMillis = millis();
+	hallSensor.Update(currentMillis);     // TODO: disable this if not in seek mode (maybe just use pin/irq directly rather than button class??)
+	idleTimer.Update(currentMillis);      // TODO: skip this if not in powered state?
+	warmupTimer.Update(currentMillis);
+	flasher.Update(currentMillis);        // TODO: skip if not powered or moving?
 }
 
 
@@ -98,7 +110,7 @@ void TurntableMgr::PollTouchscreen()
 		byte i = 0;
 		while (lastbtn == -1 && i < numButtons)
 		{
-			if (button[i].Press(x, y))
+			if ((*button)[i].Press(x, y))
 				lastbtn = i;
 			i++;
 		}
@@ -106,7 +118,7 @@ void TurntableMgr::PollTouchscreen()
 
 	if (!touched && lastbtn != -1)
 	{
-		button[lastbtn].Release();
+		(*button)[lastbtn].Release();
 		lastbtn = -1;
 	}
 }
@@ -127,19 +139,119 @@ void TurntableMgr::ConfigureStepper()
 	accelStepper.setAcceleration(stepperAcceleration);
 }
 
+
+//  state transition functions  ===================================================================
+
+void TurntableMgr::stateIdle()
+{
+	// power off the stepper
+	afStepper->release();
+
+	// turn off the warning light
+	flasher.SetLED(RgbLed::OFF);
+
+	//	dcc.ResumeBitstream();
+}
+
+void TurntableMgr::stateMoving()
+{
+	//	dcc.SuspendBitstream();
+
+	flasher.SetLED(RgbLed::RED, RgbLed::FLASH);
+
+	// move to the specified siding at normal speed
+	accelStepper.setMaxSpeed(stepperMaxSpeed);
+	accelStepper.setAcceleration(stepperAcceleration);
+	moveToSiding(currentSiding);
+}
+
+void TurntableMgr::stateSeekFast()
+{
+	//	dcc.SuspendBitstream();
+
+	// start moving in a complete clockwise circle at normal speed
+	accelStepper.setMaxSpeed(stepperMaxSpeed);
+	accelStepper.setAcceleration(stepperAcceleration);
+	accelStepper.move(2 * halfCircleSteps);
+}
+
+void TurntableMgr::stateSeekSlow()
+{
+	// TODO: slow or stop first here??
+
+	// start moving in a counter clockwise halfcircle at low speed
+	accelStepper.setMaxSpeed(stepperLowSpeed);
+	accelStepper.setAcceleration(stepperAcceleration);
+	accelStepper.move(-halfCircleSteps);
+}
+
+void TurntableMgr::statePowered()
+{
+	// TODO: stop stepper if running?  e.g., for in between seek states?
+	// TODO: go to full step before stopping
+	accelStepper.stop();
+
+	// start the timer for the transition to idle state
+	idleTimer.StartTimer(idleTimeout);
+
+	//	dcc.ResumeBitstream();
+}
+
+void TurntableMgr::stateWarmup()
+{
+	warmupTimer.StartTimer(warmupTimeout);
+	flasher.SetLED(RgbLed::RED, RgbLed::FLASH);
+}
+
+
+void TurntableMgr::raiseEvent(const ttEvent event)
+{
+	byte i = 0;
+	const byte n = sizeof(stateTransMatrix) / sizeof(stateTransMatrixRow);
+
+	// loop through state transition table until we find matching state and event
+	while ((i < n) && !(currentState == stateTransMatrix[i].currState && event == stateTransMatrix[i].event)) i++;
+
+	// if there was no match just return
+	if (i == n)
+	{
+		Serial.println("event ignored, no match");
+		return;
+	}
+
+	Serial.print("executing event: "); Serial.println(stateTransMatrix[i].event);
+	Serial.print("current state  : "); Serial.println(stateTransMatrix[i].nextState);
+
+	// otherwise transition to next state specified in the matching row
+	currentState = stateTransMatrix[i].nextState;
+
+	// call the state transition function
+	(*this.*ttStateFunctions[currentState])();
+}
+
+
+
+//  local functions   ===========================================================================
+
 void TurntableMgr::ConfigureButtons()
 {
+	button[0] = new GraphicButton(&tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 10, 60, 60, 40, "1", 1);
+	button[1] = new GraphicButton(&tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 80, 60, 60, 40, "2", 2);
+	button[2] = new GraphicButton(&tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 150, 60, 60, 40, "3", 3);
+
 	for (byte i = 0; i < numButtons; i++)
 	{
-		button[i].SetButtonHandler(this, WrapperButtonHandler);
-		button[i].SetActive(true);
+		(*button)[i].SetButtonHandler(this, WrapperButtonHandler);
+		(*button)[i].SetActive(true);
 	}
+
+	Serial.println("buttons configured");
 }
 
 
 void TurntableMgr::moveToSiding(byte siding)
 {
-	Serial.print("siding:  "); Serial.println(siding);
+	Serial.print("move to siding:  "); Serial.println(siding);
 
 	int32_t targetPos = FactoryDefaultSettings[siding - 1].Value;
 	Serial.print("targetPos:  "); Serial.println(targetPos);
@@ -152,17 +264,17 @@ void TurntableMgr::moveToSiding(byte siding)
 	int32_t deltaCW = targetPos - currentPos;
 	int32_t deltaCCW = (targetPos - halfCircleSteps) - currentPos;
 
+	if (deltaCW == 0 || deltaCCW == 0) return;
+
 	Serial.print("delta CW:  "); Serial.println(deltaCW);
 	Serial.print("delta CCW:  "); Serial.println(deltaCCW);
 
 	if (abs(deltaCW) < abs(deltaCCW))
 	{
-		turntableMode = RUNNING_CW;
 		accelStepper.move(deltaCW);
 	}
 	else
 	{
-		turntableMode = RUNNING_CCW;
 		accelStepper.move(deltaCCW);
 	}
 }
@@ -183,18 +295,34 @@ uint16_t TurntableMgr::BasicPosition(int32_t pos)
 }
 
 
+void TurntableMgr::WrapperIdleTimerHandler() { currentInstance->raiseEvent(IDLETIMER); }
+void TurntableMgr::WrapperWarmupTimerHandler() { currentInstance->raiseEvent(WARMUPTIMER); }
+
+void TurntableMgr::WrapperHallSensorHandler(bool ButtonState)
+{
+	if (ButtonState)
+	{
+		currentInstance->raiseEvent(HALLSENSOR_HIGH);
+	}
+	else
+	{
+		currentInstance->raiseEvent(HALLSENSOR_LOW);
+	}
+}
+
 void TurntableMgr::WrapperButtonHandler(void* p, bool state, unsigned int data)
 {
 	static_cast<TurntableMgr*>(p)->ButtonEventHandler(state, data);
 }
 
-void TurntableMgr::ButtonEventHandler(bool state, unsigned int data)
+void TurntableMgr::ButtonEventHandler(const bool state, const unsigned int data)
 {
 	if (state)
-		moveToSiding(data);
+	{
+		currentSiding = data;
+		raiseEvent(BUTTON_SIDING);
+	}
 }
-
-
 
 
 

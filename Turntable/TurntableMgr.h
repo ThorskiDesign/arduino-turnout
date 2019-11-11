@@ -11,6 +11,10 @@
 
 #include "DCCdecoder.h"
 #include "GraphicButton.h"
+#include "Button.h"
+#include "EventTimer.h"
+#include "RGB_LED.h"
+
 #include "Adafruit_ILI9341.h"
 #include <Adafruit_FT6206.h>
 #include <Wire.h>
@@ -27,7 +31,9 @@ public:
 	void Update();
 
 private:
-	// hardware assignments
+	
+	// hardware assignments ============================================================================
+	
 	//const byte HWirqPin = 2;       set in bitstream.h
 	const byte hallSensorPin = 3;
 	const byte microSDPin = 4;
@@ -42,30 +48,100 @@ private:
 	const byte ICS_PSCLK_Pin = 13;
 	const byte LEDPin = 14;
 
-	// operational modes
-	enum ttMode
+
+	// State machine ======================================================================================
+
+	enum ttState : byte
 	{
-		IDLE,              // tt stationary, with motor powered off, listening for dcc and touchscreen
-		POWERED,           // tt stationary, with motor powered on, listening for dcc and touchscreen
-		HOMING,            // seeking hall sensor zero reference. dcc and touchscreen suspended.
-		CALIBRATE,         // setting siding step counts. dcc suspended. listening for touchscreen.
-		RUNNING_CW,        // tt rotating clockwise. dcc and touchscreen suspended.
-		RUNNING_CCW        // tt rotating counterclockwise. dcc and touchscreen suspended.
+		IDLE,           // stationary, with motor powered off, listening for dcc and touchscreen
+		POWERED,        // stationary, with motor powered on, listening for dcc and touchscreen, flasher on
+		WARMUP,         // stationary but with pending move, dcc and touchscreen suspended, flasher on
+		MOVING,         // rotating, dcc and touchscreen suspended, flasher on
+		SEEKFAST,       // seeking the hall sensor at high speed in the clockwise direction
+		SEEKSLOW,       // hall sensor has gone active, tt moving in ccw direction until it deactivates again
 	};
 
-	const bool dccIsActive[6] = { true, true, false, false, false, false };
-	const bool tsIsActive[6] = { true, true, false, true, false, false };
-	const bool stepperIsRunning[6] = { false, false, true, true, true, true };
+	ttState currentState = IDLE;
 
-	ttMode turntableMode = IDLE;
+	// state pointer and functions
+	typedef void(TurntableMgr::*StateFunctionPointer)();
+
+	//  keep this array in the same size/order as the ttState enum
+	StateFunctionPointer ttStateFunctions[6] =
+	{
+		&TurntableMgr::stateIdle,
+		&TurntableMgr::statePowered,
+		&TurntableMgr::stateWarmup,
+		&TurntableMgr::stateMoving,
+		&TurntableMgr::stateSeekFast,
+		&TurntableMgr::stateSeekSlow,
+	};
+
+	// the state transition functions
+	void stateIdle();
+	void statePowered();
+	void stateWarmup();
+	void stateMoving();
+	void stateSeekFast();
+	void stateSeekSlow();
+
+	// the state transition events
+	enum ttEvent : byte
+	{
+		NONE,
+		ANY,
+		BUTTON_SIDING,
+		MOVE_DONE,
+		HALLSENSOR_HIGH,
+		HALLSENSOR_LOW,
+		IDLETIMER,
+		WARMUPTIMER,
+	};
+
+	void raiseEvent(ttEvent event);
+
+	// state transition mapping
+	struct stateTransMatrixRow
+	{
+		ttState currState;
+		ttEvent event;
+		ttState nextState;
+	};
+
+	stateTransMatrixRow stateTransMatrix[7] =
+	{
+		// CURR STATE     // EVENT           // NEXT STATE
+		{ IDLE,           BUTTON_SIDING,     WARMUP, },
+		{ WARMUP,         WARMUPTIMER,       MOVING },
+		{ POWERED,        BUTTON_SIDING,     MOVING, },
+		{ POWERED,        IDLETIMER,         IDLE },
+		{ MOVING,         MOVE_DONE,         POWERED, },
+		{ SEEKFAST,       HALLSENSOR_HIGH,   SEEKSLOW },
+		{ SEEKSLOW,       HALLSENSOR_LOW,    POWERED },
+	};
+
+	// related states to enable/disable things that need to be performed every update iteration
+	//bool tsIsActive = true;
+	//bool dccIsActive = true;
+	//bool stepperIsActive = true;   // TODO: this will force seek mode on every startup, set to false
+
+
+	// Turntable locals  ========================================================================
+
 	byte currentSiding = 0;
 	byte lastSiding = 0;
 
-	// pointer to allow us to access member objects from callbacks
-	static TurntableMgr* currentInstance;
+	Button hallSensor { hallSensorPin, true };
+	EventTimer idleTimer;
+	EventTimer warmupTimer;
+	RgbLed flasher{ LEDPin, LEDPin, LEDPin };    // single led.  TODO: update RGBLed to allow single led?
+
+	const uint16_t idleTimeout = 10000;   // 10 sec, for testing
+	const uint16_t warmupTimeout = 5000;  // 5 sec
 
 
-	// tft display and touchscreen setup   =================================================
+
+	// tft display and touchscreen setup   ========================================================
 
 #define TFT_rotation 0
 	const uint16_t white = 0xFFFF;
@@ -74,11 +150,12 @@ private:
 	Adafruit_FT6206 ctp = Adafruit_FT6206();                              // touchscreen
 
 	const byte numButtons = 3;
-	GraphicButton button[3]{
-		{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 10, 10, 80, 40, "1", 1 },
-		{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 10, 60, 80, 40, "2", 2 },
-		{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 10, 110, 80, 40, "3", 3 },
-	};
+	GraphicButton* button[3];
+	//GraphicButton button[12]{
+	//	{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 10, 10, 80, 40, "1", 1 },
+	//	{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 10, 60, 80, 40, "2", 2 },
+	//	{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 10, 110, 80, 40, "3", 3 },
+	//};
 
 	int lastbtn = -1;
 
@@ -87,12 +164,14 @@ private:
 
 
 	// stepper motor and related =================================================================
+
 	const byte stepperStepsPerRev = 200;
 	const byte stepperMicroSteps = 16;
-	const uint16_t stepperMaxSpeed = 500;
-	const uint16_t stepperAcceleration = 25;
 	const byte ttGearRatio = 18;
 	const byte motorShieldPort = 2;
+	const uint16_t stepperMaxSpeed = 500;
+	const uint16_t stepperAcceleration = 25;
+	const uint16_t stepperLowSpeed = 50;
 
 	const uint16_t stepsPerSiding = (uint16_t)ttGearRatio * stepperStepsPerRev * stepperMicroSteps / 36;  // for 10 degree spacing between sidings
 	const uint16_t halfCircleSteps = (uint16_t)ttGearRatio * stepperStepsPerRev * stepperMicroSteps / 2;
@@ -108,7 +187,7 @@ private:
 
 	// DCC  ======================================================================================
 
-	DCCdecoder dcc;
+	//DCCdecoder dcc;
 	byte dccAddress = 1;     // the dcc address of the decoder
 
 	// define our available cv's  (allowable range 33-81 per 9.2.2)
@@ -152,12 +231,15 @@ private:
 	const CV16bit FactoryDefaultSettings[3] =
 	{
 		{ addrSiding1Steps, 0, false },
-		{ addrSiding2Steps, 4 * stepsPerSiding, false },
-		{ addrSiding2Steps, 8 * stepsPerSiding, false },
+		{ addrSiding2Steps, 1 * stepsPerSiding, false },
+		{ addrSiding2Steps, 2 * stepsPerSiding, false },
 	};
 
 
 	// event handlers  ===========================================================================
+
+	// pointer to allow us to access member objects from callbacks
+	static TurntableMgr* currentInstance;
 
 	void ButtonEventHandler(bool state, unsigned int data);
 	static void StepperClockwiseStep();
@@ -165,6 +247,9 @@ private:
 
 	// wrappers for callbacks
 	static void WrapperButtonHandler(void* p, bool state, unsigned int data);
+	static void WrapperHallSensorHandler(bool ButtonState);
+	static void WrapperIdleTimerHandler();
+	static void WrapperWarmupTimerHandler();
 };
 
 #endif
