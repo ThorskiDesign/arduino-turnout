@@ -19,15 +19,22 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Packet-test", "Packet-test\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Turntable", "Turntable\Turntable.vcxproj", "{C5F80730-F44F-4478-BDAE-6634EFC2CA88}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Turntable-test", "Turntable-test\Turntable-test.vcxproj", "{945F09C6-9FD3-44AB-B763-6A1DB5D9CECD}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Optimization-test", "Optimization-test\Optimization-test.vcxproj", "{B843BC4F-191B-488C-B26D-EBF8FFA4254D}"
+EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		DCCdecoder\DCCdecoder.vcxitems*{5499bc36-5de3-4166-b157-44140114f299}*SharedItemsImports = 4
 		TurnoutLibs\TurnoutLibs.vcxitems*{5499bc36-5de3-4166-b157-44140114f299}*SharedItemsImports = 4
 		DCCdecoder\DCCdecoder.vcxitems*{738749ae-e647-48ae-8ab0-3924039ee46f}*SharedItemsImports = 4
+		TurnoutLibs\TurnoutLibs.vcxitems*{738749ae-e647-48ae-8ab0-3924039ee46f}*SharedItemsImports = 4
 		DCCdecoder\DCCdecoder.vcxitems*{7bd72989-cad1-484f-a095-08e36f3875cc}*SharedItemsImports = 4
 		DCCdecoder\DCCdecoder.vcxitems*{7d496680-f1b8-43f0-8b6a-e927f922dc15}*SharedItemsImports = 4
 		TurnoutLibs\TurnoutLibs.vcxitems*{7d496680-f1b8-43f0-8b6a-e927f922dc15}*SharedItemsImports = 4
 		DCCdecoder\DCCdecoder.vcxitems*{9133b2ab-915e-4c35-b94b-320a8a38ef94}*SharedItemsImports = 4
+		DCCdecoder\DCCdecoder.vcxitems*{b843bc4f-191b-488c-b26d-ebf8ffa4254d}*SharedItemsImports = 4
+		TurnoutLibs\TurnoutLibs.vcxitems*{b843bc4f-191b-488c-b26d-ebf8ffa4254d}*SharedItemsImports = 4
 		DCCdecoder\DCCdecoder.vcxitems*{c5f80730-f44f-4478-bdae-6634efc2ca88}*SharedItemsImports = 4
 		TurnoutLibs\TurnoutLibs.vcxitems*{c5f80730-f44f-4478-bdae-6634efc2ca88}*SharedItemsImports = 4
 		TurnoutLibs\TurnoutLibs.vcxitems*{cc6dfd6e-c8a3-4672-b882-cfa7b5a6918b}*SharedItemsImports = 9
@@ -62,6 +69,14 @@ Global
 		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Debug|x86.Build.0 = Debug|Win32
 		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.ActiveCfg = Release|Win32
 		{C5F80730-F44F-4478-BDAE-6634EFC2CA88}.Release|x86.Build.0 = Release|Win32
+		{945F09C6-9FD3-44AB-B763-6A1DB5D9CECD}.Debug|x86.ActiveCfg = Debug|Win32
+		{945F09C6-9FD3-44AB-B763-6A1DB5D9CECD}.Debug|x86.Build.0 = Debug|Win32
+		{945F09C6-9FD3-44AB-B763-6A1DB5D9CECD}.Release|x86.ActiveCfg = Release|Win32
+		{945F09C6-9FD3-44AB-B763-6A1DB5D9CECD}.Release|x86.Build.0 = Release|Win32
+		{B843BC4F-191B-488C-B26D-EBF8FFA4254D}.Debug|x86.ActiveCfg = Debug|Win32
+		{B843BC4F-191B-488C-B26D-EBF8FFA4254D}.Debug|x86.Build.0 = Debug|Win32
+		{B843BC4F-191B-488C-B26D-EBF8FFA4254D}.Release|x86.ActiveCfg = Release|Win32
+		{B843BC4F-191B-488C-B26D-EBF8FFA4254D}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

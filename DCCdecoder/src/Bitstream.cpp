@@ -245,11 +245,13 @@ void BitStream::HandleError()
 // process the queued DCC timestamps to see if they represent a one or a zero.
 void BitStream::ProcessTimestamps()
 {
+#ifdef _DEBUG
 	// generate debugging pulses on scope to monitor simpleQueue size.
-	//for (int i = 0; i < simpleQueue.Size(); i++)
-	//{
-	//	HW_DEBUG_PULSE_18();
-	//}
+	for (int i = 0; i < simpleQueue.Size(); i++)
+	{
+		HW_DEBUG_PULSE_18();
+	}
+#endif // DEBUG
 
 	while (simpleQueue.Size() > 0)
 	{

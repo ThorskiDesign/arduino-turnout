@@ -48,8 +48,8 @@ void BitErrorHandler(byte errorCode)
 }
 
 
-void setup()
     // put your setup code here, to run once:
+void setup()
 {
     // for testing timing
     pinMode(18, OUTPUT);
