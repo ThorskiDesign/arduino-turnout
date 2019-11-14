@@ -9,17 +9,28 @@
 #include "WProgram.h"
 #endif
 
-#include "DCCdecoder.h"
-#include "GraphicButton.h"
+
+// build dcc and/or touchscreen control
+//#define WITH_DCC
+#define WITH_TOUCHSCREEN
+
+
 #include "Button.h"
 #include "EventTimer.h"
 #include "RGB_LED.h"
+#include <AccelStepper.h>
+#include <Adafruit_MotorShield.h>
 
+#if defined(WITH_DCC)
+#include "DCCdecoder.h"
+#endif // WITH_DCC
+
+#if defined(WITH_TOUCHSCREEN)
+#include "GraphicButton.h"
 #include "Adafruit_ILI9341.h"
 #include <Adafruit_FT6206.h>
 #include <Wire.h>
-#include <AccelStepper.h>
-#include <Adafruit_MotorShield.h>
+#endif // WITH_TOUCHSCREEN
 
 
 
@@ -31,9 +42,9 @@ public:
 	void Update();
 
 private:
-	
+
 	// hardware assignments ============================================================================
-	
+
 	//const byte HWirqPin = 2;       set in bitstream.h
 	const byte hallSensorPin = 3;
 	const byte microSDPin = 4;
@@ -57,11 +68,11 @@ private:
 		POWERED,        // stationary, with motor powered on, listening for dcc and touchscreen, flasher on
 		WARMUP,         // stationary but with pending move, dcc and touchscreen suspended, flasher on
 		MOVING,         // rotating, dcc and touchscreen suspended, flasher on
-		SEEKFAST,       // seeking the hall sensor at high speed in the clockwise direction
-		SEEKSLOW,       // hall sensor has gone active, tt moving in ccw direction until it deactivates again
+		SEEK,       // seeking the hall sensor at high speed in the clockwise direction
 	};
 
-	ttState currentState = IDLE;
+	ttState currentState = IDLE;    // test - simulate power loss while moving
+	byte subState = 0;    // track sequence of events within a state, 0 = transition steps for entering that state
 
 	// state pointer and functions
 	typedef void(TurntableMgr::*StateFunctionPointer)();
@@ -73,17 +84,17 @@ private:
 		&TurntableMgr::statePowered,
 		&TurntableMgr::stateWarmup,
 		&TurntableMgr::stateMoving,
-		&TurntableMgr::stateSeekFast,
-		&TurntableMgr::stateSeekSlow,
+		&TurntableMgr::stateSeek,
 	};
+
+	StateFunctionPointer currentStateFunction = 0;
 
 	// the state transition functions
 	void stateIdle();
 	void statePowered();
 	void stateWarmup();
 	void stateMoving();
-	void stateSeekFast();
-	void stateSeekSlow();
+	void stateSeek();
 
 	// the state transition events
 	enum ttEvent : byte
@@ -92,8 +103,6 @@ private:
 		ANY,
 		BUTTON_SIDING,
 		MOVE_DONE,
-		HALLSENSOR_HIGH,
-		HALLSENSOR_LOW,
 		IDLETIMER,
 		WARMUPTIMER,
 	};
@@ -116,14 +125,9 @@ private:
 		{ POWERED,        BUTTON_SIDING,     MOVING, },
 		{ POWERED,        IDLETIMER,         IDLE },
 		{ MOVING,         MOVE_DONE,         POWERED, },
-		{ SEEKFAST,       HALLSENSOR_HIGH,   SEEKSLOW },
-		{ SEEKSLOW,       HALLSENSOR_LOW,    POWERED },
+		{ SEEK,           MOVE_DONE,         POWERED },
 	};
 
-	// related states to enable/disable things that need to be performed every update iteration
-	//bool tsIsActive = true;
-	//bool dccIsActive = true;
-	//bool stepperIsActive = true;   // TODO: this will force seek mode on every startup, set to false
 
 
 	// Turntable locals  ========================================================================
@@ -131,17 +135,19 @@ private:
 	byte currentSiding = 0;
 	byte lastSiding = 0;
 
-	Button hallSensor { hallSensorPin, true };
+	Button hallSensor{ hallSensorPin, true };
 	EventTimer idleTimer;
 	EventTimer warmupTimer;
 	RgbLed flasher{ LEDPin, LEDPin, LEDPin };    // single led.  TODO: update RGBLed to allow single led?
 
-	const uint16_t idleTimeout = 10000;   // 10 sec, for testing
+	const uint16_t idleTimeout = 5000;   // 5 sec, for testing
 	const uint16_t warmupTimeout = 5000;  // 5 sec
 
 
 
 	// tft display and touchscreen setup   ========================================================
+
+#if defined(WITH_TOUCHSCREEN)
 
 #define TFT_rotation 0
 	const uint16_t white = 0xFFFF;
@@ -150,17 +156,20 @@ private:
 	Adafruit_FT6206 ctp = Adafruit_FT6206();                              // touchscreen
 
 	const byte numButtons = 3;
-	GraphicButton* button[3];
-	//GraphicButton button[12]{
-	//	{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 10, 10, 80, 40, "1", 1 },
-	//	{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 10, 60, 80, 40, "2", 2 },
-	//	{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 10, 110, 80, 40, "3", 3 },
-	//};
+	//GraphicButton* button[3];
+	GraphicButton button[3]{
+		{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 20, 120, 60, 40, "1", 1 },
+		{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 90, 120, 60, 40, "2", 2 },
+		{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 160, 120, 60, 40, "3", 3 },
+	};
 
 	int lastbtn = -1;
 
 	void ConfigureButtons();
+	void ConfigureTouchscreen();
 	void PollTouchscreen();
+
+#endif    // defined(WITH_TOUCHSCREEN)
 
 
 	// stepper motor and related =================================================================
@@ -180,14 +189,17 @@ private:
 	Adafruit_StepperMotor* afStepper;
 	AccelStepper accelStepper;
 
-	void ConfigureStepper();
+	void configureStepper();
 	void moveToSiding(byte siding);
-	uint16_t BasicPosition(int32_t pos);
+	uint16_t findBasicPosition(int32_t pos);
+	int32_t findFullStep(int32_t microsteps);
 
 
 	// DCC  ======================================================================================
 
-	//DCCdecoder dcc;
+#if defined(WITH_DCC)
+
+	DCCdecoder dcc;
 	byte dccAddress = 1;     // the dcc address of the decoder
 
 	// define our available cv's  (allowable range 33-81 per 9.2.2)
@@ -213,6 +225,9 @@ private:
 		{ CV_AddressLSB, 1, false },
 		{ CV_AddressMSB, 0, false },
 	};
+
+#endif	// WITH_DCC
+
 
 	// set up 16 bit vars for eeprom storage
 	// these are not accessible or programmable via DCC, because they are 16 bit
@@ -247,7 +262,7 @@ private:
 
 	// wrappers for callbacks
 	static void WrapperButtonHandler(void* p, bool state, unsigned int data);
-	static void WrapperHallSensorHandler(bool ButtonState);
+	//static void WrapperHallSensorHandler(bool ButtonState);
 	static void WrapperIdleTimerHandler();
 	static void WrapperWarmupTimerHandler();
 };

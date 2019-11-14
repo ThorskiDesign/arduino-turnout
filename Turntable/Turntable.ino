@@ -20,6 +20,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "TurntableMgr.h"
+//#include "HardwareDebug.h"
 
 
 TurntableMgr TurntableManager;
@@ -27,14 +28,14 @@ TurntableMgr TurntableManager;
 
 void setup()
 {
-//#ifdef _DEBUG
+#ifdef _DEBUG
 	// for timing tests
-	pinMode(0, OUTPUT);
-	pinMode(1, OUTPUT);
+	//pinMode(0, OUTPUT);
+	//pinMode(1, OUTPUT);
 
 	Serial.begin(115200);
 	//delay(1000);   // delay for Serial.print in factory reset (??)
-//#endif
+#endif
 
 	// initialize the turntable manager
 	TurntableManager.Initialize();
@@ -45,4 +46,7 @@ void loop()
 {
 	// this checks for new bitsteam data, and updates the display and stepper motor
 	TurntableManager.Update();
+
+	//hwDebugValueToPulses(freeMemory(), 0, 2048);
+	//hwDebugValueToSerial(freeMemory());
 }
