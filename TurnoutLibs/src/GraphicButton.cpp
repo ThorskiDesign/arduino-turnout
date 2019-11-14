@@ -1,8 +1,12 @@
 
 #include "GraphicButton.h"
 
+GraphicButton::GraphicButton()
+{
+}
+
 GraphicButton::GraphicButton(Adafruit_ILI9341* tft, GraphicButtonType t, GraphicButtonShape shp,
-	unsigned int xp, unsigned int yp, unsigned int xs, unsigned int ys, String lbl, byte id)
+	unsigned int xp, unsigned int yp, byte xs, byte ys, String lbl, byte id)
 {
 	tftdisplay = tft;
 	type = t;
@@ -25,14 +29,14 @@ void GraphicButton::SetLabel(String l, bool show)
 	if (!redrawPending) DrawButton();
 }
 
-void GraphicButton::SetColors(unsigned int on, unsigned int off, unsigned int text, unsigned int border)
-{
-	onColor = on;
-	offColor = off;
-	textColor = text;
-	borderColor = border;
-	if (!redrawPending) DrawButton();
-}
+//void GraphicButton::SetColors(unsigned int on, unsigned int off, unsigned int text, unsigned int border)
+//{
+//	onColor = on;
+//	offColor = off;
+//	textColor = text;
+//	borderColor = border;
+//	if (!redrawPending) DrawButton();
+//}
 
 void GraphicButton::SetState(const bool state)
 {
