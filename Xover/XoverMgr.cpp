@@ -44,6 +44,8 @@ XoverMgr::XoverMgr()
 	dcc.SetBasicAccessoryDecoderPacketHandler(WrapperDCCAccPacket);
 	dcc.SetExtendedAccessoryDecoderPacketHandler(WrapperDCCExtPacket);
 	dcc.SetBasicAccessoryPomPacketHandler(WrapperDCCAccPomPacket);
+	dcc.SetBitstreamMaxErrorHandler(WrapperMaxBitErrors);
+	dcc.SetPacketMaxErrorHandler(WrapperMaxPacketErrors);
 	dcc.SetDecodingErrorHandler(WrapperDCCDecodingError);
 
 	// configure timer event handlers
@@ -310,6 +312,22 @@ void XoverMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, 
 
 
 
+// handle decoding errors
+void XoverMgr::DCCDecodingError(byte errorCode)
+{
+	if (!showErrorIndication) return;
+
+	// set up timer for LED indication, normal led will resume after this timer expires
+	errorTimer.StartTimer(1000);
+	led.SetLED(RgbLed::CYAN, RgbLed::FLASH);
+
+	#ifdef _DEBUG
+	Serial.print("Packet error, code: ");
+	Serial.println(errorCode, DEC);
+	#endif
+}
+
+
 
 // ========================================================================================================
 
@@ -340,20 +358,12 @@ void XoverMgr::WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byte 
 	currentInstance->DCCPomHandler(outputAddress, instructionType, cv, data);
 }
 
-void XoverMgr::WrapperDCCDecodingError(byte errorCode)
-{
-	// TODO: add optional LED indication
-
-#ifdef _DEBUG
-	Serial.print("Packet error, code: ");
-	Serial.println(errorCode, DEC);
-#endif
-}
+void XoverMgr::WrapperMaxBitErrors(byte errorCode) { currentInstance->TurnoutBase::MaxBitErrorHandler(); }
+void XoverMgr::WrapperMaxPacketErrors(byte errorCode) { currentInstance->TurnoutBase::MaxPacketErrorHandler(); }
+void XoverMgr::WrapperDCCDecodingError(byte errorCode) { currentInstance->DCCDecodingError(errorCode); }
 
 
 // timer callback wrappers
 void XoverMgr::WrapperResetTimer() { currentInstance->ResetTimerHandler(); }
 void XoverMgr::WrapperErrorTimer() { currentInstance->ErrorTimerHandler(); }
 void XoverMgr::WrapperServoTimer() { currentInstance->EndServoMove(); }
-void XoverMgr::WrapperMaxBitErrors() { currentInstance->TurnoutBase::MaxBitErrorHandler(); }
-void XoverMgr::WrapperMaxPacketErrors() { currentInstance->TurnoutBase::MaxPacketErrorHandler(); }

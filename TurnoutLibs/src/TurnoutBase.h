@@ -84,17 +84,18 @@ protected:
 	// Hardware assignments
 	const byte Aux1Pin = 0;
 	const byte Aux2Pin = 1;
-	//const byte HWirqPin = 2;       set in bitstream.h
+	//const byte HWirqPin = 2;     //  set in bitstream.h
 	const byte ButtonPin = 3;
 	const byte ServoPowerPin = 4;
 	const byte Servo1Pin = 5;
 	const byte LedBPin = 6;
 	const byte LedRPin = 7;
-	//const byte ICRPin = 8;         set in bitstream.h
+	//const byte LedGPin = 8;         // for V1 boards
+	//const byte ICRPin = 8;        // set in bitstream.h
 	const byte Servo2Pin = 9;
 	const byte Servo3Pin = 10;
 	const byte Servo4Pin = 11;
-	const byte LedGPin = 12;
+	const byte LedGPin = 12;        // for V2 boards
 	const byte Relay1Pin = 14;
 	const byte Relay2Pin = 15;
 	const byte Sensor1Pin = 16;

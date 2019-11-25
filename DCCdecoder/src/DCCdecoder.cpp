@@ -170,7 +170,7 @@ void DCCdecoder::ProcessTimeStamps()
 #endif
 
 		// check bit errors and raise event if necessary
-		if ((bitErrorCount > maxBitErrors) && bitstreamErrorHandler) bitstreamMaxErrorHandler(lastBitError);
+		if ((bitErrorCount > maxBitErrors) && bitstreamMaxErrorHandler) bitstreamMaxErrorHandler(lastBitError);
 
 		// if we see repeated packet errors, reset bitstream capture
 		if (packetErrorCount > maxPacketErrors)
@@ -179,8 +179,8 @@ void DCCdecoder::ProcessTimeStamps()
 			bitStream.Suspend();
 			bitStream.Resume();
 
-			// raise packet error event
-			if (packetErrorHandler) packetMaxErrorHandler(lastPacketError);
+			// raise max packet error event
+			if (packetMaxErrorHandler) packetMaxErrorHandler(lastPacketError);
 		}
 
 		lastMillis = currentMillis;

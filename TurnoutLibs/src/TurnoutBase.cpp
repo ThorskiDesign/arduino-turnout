@@ -129,8 +129,8 @@ void TurnoutBase::MaxPacketErrorHandler()
 	if (!showErrorIndication) return;
 
 	// set up timer for LED indication, normal led will resume after this timer expires
-	errorTimer.StartTimer(2000);
-	led.SetLED(RgbLed::YELLOW, RgbLed::FLASH);
+	errorTimer.StartTimer(500);
+	led.SetLED(RgbLed::YELLOW, RgbLed::ON);
 }
 
 void TurnoutBase::MaxBitErrorHandler()

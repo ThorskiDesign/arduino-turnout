@@ -40,6 +40,8 @@ TurnoutMgr::TurnoutMgr()
 	dcc.SetBasicAccessoryDecoderPacketHandler(WrapperDCCAccPacket);
 	dcc.SetExtendedAccessoryDecoderPacketHandler(WrapperDCCExtPacket);
 	dcc.SetBasicAccessoryPomPacketHandler(WrapperDCCAccPomPacket);
+	dcc.SetBitstreamMaxErrorHandler(WrapperMaxBitErrors);
+	dcc.SetPacketMaxErrorHandler(WrapperMaxPacketErrors);
 	dcc.SetDecodingErrorHandler(WrapperDCCDecodingError);
 
 	// configure timer event handlers
@@ -323,6 +325,22 @@ void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV
 }
 
 
+// handle decoding errors
+void TurnoutMgr::DCCDecodingError(byte errorCode)
+{
+	if (!showErrorIndication) return;
+
+	// set up timer for LED indication, normal led will resume after this timer expires
+	errorTimer.StartTimer(1000);
+	led.SetLED(RgbLed::CYAN, RgbLed::FLASH);
+
+	#ifdef _DEBUG
+	Serial.print("Packet error, code: ");
+	Serial.println(errorCode, DEC);
+	#endif
+}
+
+
 // ========================================================================================================
 
 TurnoutMgr *TurnoutMgr::currentInstance = 0;    // pointer to allow us to access member objects from callbacks
@@ -352,20 +370,12 @@ void TurnoutMgr::WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byt
 	currentInstance->DCCPomHandler(outputAddress, instructionType, cv, data);
 }
 
-void TurnoutMgr::WrapperDCCDecodingError(byte errorCode)
-{
-	// TODO: add optional LED indication
-
-#ifdef _DEBUG
-	Serial.print("Packet error, code: ");
-	Serial.println(errorCode, DEC);
-#endif
-}
+void TurnoutMgr::WrapperMaxBitErrors(byte errorCode) { currentInstance->TurnoutBase::MaxBitErrorHandler(); }
+void TurnoutMgr::WrapperMaxPacketErrors(byte errorCode) { currentInstance->TurnoutBase::MaxPacketErrorHandler(); }
+void TurnoutMgr::WrapperDCCDecodingError(byte errorCode) { currentInstance->DCCDecodingError(errorCode); }
 
 
 // timer callback wrappers
 void TurnoutMgr::WrapperResetTimer() { currentInstance->ResetTimerHandler(); }
 void TurnoutMgr::WrapperErrorTimer() { currentInstance->ErrorTimerHandler(); }
 void TurnoutMgr::WrapperServoTimer() { currentInstance->EndServoMove(); }
-void TurnoutMgr::WrapperMaxBitErrors() { currentInstance->TurnoutBase::MaxBitErrorHandler(); }
-void TurnoutMgr::WrapperMaxPacketErrors() { currentInstance->TurnoutBase::MaxPacketErrorHandler(); }
