@@ -26,7 +26,7 @@
 #endif // WITH_DCC
 
 #if defined(WITH_TOUCHSCREEN)
-#include "GraphicButton.h"
+#include "Touchpad.h"
 #include "Adafruit_ILI9341.h"
 #include <Adafruit_FT6206.h>
 #include <Wire.h>
@@ -46,18 +46,18 @@ private:
 	// hardware assignments ============================================================================
 
 	//const byte HWirqPin = 2;       set in bitstream.h
-	const byte hallSensorPin = 3;
-	const byte microSDPin = 4;
-	const byte backlightPin = 5;
-	const byte speakerPin = 6;
-	const byte touchscreenIntPin = 7;
+	enum : byte { hallSensorPin = 3 };
+	//const byte microSDPin = 4;
+	//const byte backlightPin = 5;
+	//const byte speakerPin = 6;
+	//const byte touchscreenIntPin = 7;
 	//const byte ICRPin = 8;         set in bitstream.h
-	const byte TFT_DC_Pin = 9;
-	const byte TFT_CS_Pin = 10;
-	const byte ICSP_MOSI_Pin = 11;   // these are the defaults for the adafruilt display
-	const byte ICSP_MISO_Pin = 12;
-	const byte ICS_PSCLK_Pin = 13;
-	const byte LEDPin = 14;
+	//const byte TFT_DC_Pin = 9;
+	//const byte TFT_CS_Pin = 10;
+	//const byte ICSP_MOSI_Pin = 11;   // these are the defaults for the adafruilt display
+	//const byte ICSP_MISO_Pin = 12;
+	//const byte ICS_PSCLK_Pin = 13;
+	enum : byte { LEDPin = 14 };
 
 
 	// State machine ======================================================================================
@@ -140,50 +140,36 @@ private:
 	EventTimer warmupTimer;
 	RgbLed flasher{ LEDPin, LEDPin, LEDPin };    // single led.  TODO: update RGBLed to allow single led?
 
-	const uint16_t idleTimeout = 5000;   // 5 sec, for testing
-	const uint16_t warmupTimeout = 5000;  // 5 sec
-
+	enum : uint16_t
+	{
+		idleTimeout = 5000,      // 5 sec, for testing
+		warmupTimeout = 5000,    // 5 sec
+	};
 
 
 	// tft display and touchscreen setup   ========================================================
 
-#if defined(WITH_TOUCHSCREEN)
-
-#define TFT_rotation 0
-	const uint16_t white = 0xFFFF;
-
-	Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS_Pin, TFT_DC_Pin);      // display
-	Adafruit_FT6206 ctp = Adafruit_FT6206();                              // touchscreen
-
-	const byte numButtons = 3;
-	//GraphicButton* button[3];
-	GraphicButton button[3]{
-		{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 20, 120, 60, 40, "1", 1 },
-		{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 90, 120, 60, 40, "2", 2 },
-		{ &tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 160, 120, 60, 40, "3", 3 },
-	};
-
-	int lastbtn = -1;
-
-	void ConfigureButtons();
-	void ConfigureTouchscreen();
-	void PollTouchscreen();
-
-#endif    // defined(WITH_TOUCHSCREEN)
+	#if defined(WITH_TOUCHSCREEN)
+	Touchpad touchpad;
+	enum : byte { pageRun, pageSetup };
+	byte currentPage = pageRun;
+	#endif    // defined(WITH_TOUCHSCREEN)
 
 
 	// stepper motor and related =================================================================
 
-	const byte stepperStepsPerRev = 200;
-	const byte stepperMicroSteps = 16;
-	const byte ttGearRatio = 18;
-	const byte motorShieldPort = 2;
-	const uint16_t stepperMaxSpeed = 500;
-	const uint16_t stepperAcceleration = 25;
-	const uint16_t stepperLowSpeed = 50;
-
-	const uint16_t stepsPerSiding = (uint16_t)ttGearRatio * stepperStepsPerRev * stepperMicroSteps / 36;  // for 10 degree spacing between sidings
-	const uint16_t halfCircleSteps = (uint16_t)ttGearRatio * stepperStepsPerRev * stepperMicroSteps / 2;
+	enum : uint16_t
+	{
+		stepperStepsPerRev = 200,
+		stepperMicroSteps = 16,
+		ttGearRatio = 18,
+		motorShieldPort = 2,
+		stepperMaxSpeed = 500,
+		stepperAcceleration = 25,
+		stepperLowSpeed = 50,
+		stepsPerSiding = ttGearRatio * stepperStepsPerRev * stepperMicroSteps / 36,  // for 10 degree spacing between sidings
+		halfCircleSteps = ttGearRatio * stepperStepsPerRev * stepperMicroSteps / 2,
+	};
 
 	Adafruit_MotorShield motorShield;
 	Adafruit_StepperMotor* afStepper;
@@ -197,7 +183,7 @@ private:
 
 	// DCC  ======================================================================================
 
-#if defined(WITH_DCC)
+	#if defined(WITH_DCC)
 
 	DCCdecoder dcc;
 	byte dccAddress = 1;     // the dcc address of the decoder
@@ -226,9 +212,10 @@ private:
 		{ CV_AddressMSB, 0, false },
 	};
 
-#endif	// WITH_DCC
+	#endif	// WITH_DCC
 
 
+	// TODO: clean up how we store the siding calibration
 	// set up 16 bit vars for eeprom storage
 	// these are not accessible or programmable via DCC, because they are 16 bit
 	const byte varStartAddress = 101;
@@ -256,15 +243,16 @@ private:
 	// pointer to allow us to access member objects from callbacks
 	static TurntableMgr* currentInstance;
 
-	void ButtonEventHandler(bool state, unsigned int data);
+	// event handler functions
+	void GraphicButtonHandler(byte buttonID, bool state);
 	static void StepperClockwiseStep();
 	static void StepperCounterclockwiseStep();
 
 	// wrappers for callbacks
-	static void WrapperButtonHandler(void* p, bool state, unsigned int data);
 	//static void WrapperHallSensorHandler(bool ButtonState);
 	static void WrapperIdleTimerHandler();
 	static void WrapperWarmupTimerHandler();
+	static void WrapperGraphicButtonHandler(byte buttonID, bool state);
 };
 
 #endif

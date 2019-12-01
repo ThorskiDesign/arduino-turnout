@@ -20,7 +20,8 @@ void TurntableMgr::Initialize()
 	warmupTimer.SetTimerHandler(WrapperWarmupTimerHandler);
 
 	#if defined(WITH_TOUCHSCREEN)
-	ConfigureTouchscreen();
+	touchpad.Init();
+	touchpad.SetGraphicButtonHandler(WrapperGraphicButtonHandler);
 	#endif // defined(WITH_TOUCHSCREEN)
 
 	// start the state machine
@@ -73,7 +74,7 @@ void TurntableMgr::stateIdle()
 	#endif // deinfed(WITH_DCC)
 
 	#if defined(WITH_TOUCHSCREEN)
-	PollTouchscreen();
+	touchpad.Update();
 	#endif // defined(WITH_TOUCHSCREEN)
 }
 
@@ -89,9 +90,6 @@ void TurntableMgr::stateMoving()
 
 		flasher.SetLED(RgbLed::RED, RgbLed::FLASH);
 
-		for (byte i = 0; i < numButtons; i++)
-			button[i].Release();
-
 		// move to the specified siding at normal speed
 		accelStepper.setMaxSpeed(stepperMaxSpeed);
 		accelStepper.setAcceleration(stepperAcceleration);
@@ -105,6 +103,10 @@ void TurntableMgr::stateMoving()
 	accelStepper.run();
 	flasher.Update(currentMillis);
 
+	#if defined(WITH_TOUCHSCREEN)
+	touchpad.Update();
+	#endif // defined(WITH_TOUCHSCREEN)
+
 	if (accelStepper.distanceToGo() == 0) raiseEvent(MOVE_DONE);
 }
 
@@ -113,7 +115,7 @@ void TurntableMgr::stateSeek()
 	switch (subState)
 	{
 	case 0:                 // transition to seek state
-	
+
 		#if defined(WITH_DCC)
 		dcc.SuspendBitstream();
 		#endif
@@ -153,7 +155,7 @@ void TurntableMgr::stateSeek()
 		if (hallSensor.SwitchState())
 		{
 			accelStepper.setCurrentPosition(0);    // we found our zero position, so set it
-			                                       // TODO: use the nearest full step value
+												   // TODO: use the nearest full step value
 			accelStepper.stop();                   // set the stepper to stop with its current speed/accel settings
 
 			subState = 6;
@@ -197,7 +199,7 @@ void TurntableMgr::statePowered()
 	#endif // deinfed(WITH_DCC)
 
 	#if defined(WITH_TOUCHSCREEN)
-	PollTouchscreen();
+	touchpad.Update();
 	#endif // defined(WITH_TOUCHSCREEN)
 
 	uint32_t currentMillis = millis();
@@ -269,91 +271,6 @@ void TurntableMgr::raiseEvent(const ttEvent event)
 
 
 //  local functions   ===========================================================================
-
-
-#if defined(WITH_TOUCHSCREEN)
-
-void TurntableMgr::ConfigureTouchscreen()
-{
-	// setup display
-	pinMode(backlightPin, OUTPUT);
-	digitalWrite(backlightPin, HIGH);
-
-	tft.begin();
-	tft.setRotation(TFT_rotation);
-	tft.fillScreen(white);
-
-	#ifdef _DEBUG
-	// read diagnostics (optional but can help debug problems)
-	uint8_t x = tft.readcommand8(ILI9341_RDMODE);
-	Serial.print("Display Power Mode: 0x"); Serial.println(x, HEX);
-	x = tft.readcommand8(ILI9341_RDMADCTL);
-	Serial.print("MADCTL Mode: 0x"); Serial.println(x, HEX);
-	x = tft.readcommand8(ILI9341_RDPIXFMT);
-	Serial.print("Pixel Format: 0x"); Serial.println(x, HEX);
-	x = tft.readcommand8(ILI9341_RDIMGFMT);
-	Serial.print("Image Format: 0x"); Serial.println(x, HEX);
-	x = tft.readcommand8(ILI9341_RDSELFDIAG);
-	Serial.print("Self Diagnostic: 0x"); Serial.println(x, HEX);
-	#endif  // DEBUG
-
-	// setup touchscreen
-	ctp.begin();
-
-	// configure buttons
-	ConfigureButtons();
-}
-
-void TurntableMgr::PollTouchscreen()
-{
-	const bool touched = ctp.touched();
-	if (touched && lastbtn == -1)
-	{
-		const TS_Point p = ctp.getPoint();
-
-		// flip touchscreen coords around to match the tft coords
-		#if TFT_rotation == 0
-		const unsigned int x = map(p.x, 0, 240, 240, 0);
-		const unsigned int y = map(p.y, 0, 320, 320, 0);
-		#endif
-		#if TFT_rotation == 1
-		const unsigned int x = map(p.y, 0, 320, 320, 0);
-		const unsigned int y = p.x;
-		#endif
-
-		// loop through buttons to check
-		byte i = 0;
-		while (lastbtn == -1 && i < numButtons)
-		{
-			if (button[i].Press(x, y))
-				lastbtn = i;
-			i++;
-		}
-	}
-
-	if (!touched && lastbtn != -1)
-	{
-		button[lastbtn].Release();
-		lastbtn = -1;
-	}
-}
-
-void TurntableMgr::ConfigureButtons()
-{
-	//button[0] = new GraphicButton(&tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 10, 60, 60, 40, "1", 1);
-	//button[1] = new GraphicButton(&tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 80, 60, 60, 40, "2", 2);
-	//button[2] = new GraphicButton(&tft, GraphicButton::TOGGLE, GraphicButton::ROUNDRECT, 150, 60, 60, 40, "3", 3);
-
-	for (byte i = 0; i < numButtons; i++)
-	{
-		button[i].SetButtonHandler(this, WrapperButtonHandler);
-		button[i].SetActive(true);
-	}
-}
-
-
-#endif    // defined(WITH_TOUCHSCREEN)
-
 
 void TurntableMgr::configureStepper()
 {
@@ -430,23 +347,69 @@ int32_t TurntableMgr::findFullStep(int32_t microsteps)
 
 
 
+// event handlers and static wrappers
+
 void TurntableMgr::WrapperIdleTimerHandler() { currentInstance->raiseEvent(IDLETIMER); }
 void TurntableMgr::WrapperWarmupTimerHandler() { currentInstance->raiseEvent(WARMUPTIMER); }
 
-void TurntableMgr::WrapperButtonHandler(void* p, bool state, unsigned int data)
+void TurntableMgr::WrapperGraphicButtonHandler(byte buttonID, bool state)
 {
-	static_cast<TurntableMgr*>(p)->ButtonEventHandler(state, data);
+	currentInstance->GraphicButtonHandler(buttonID, state);
 }
 
-void TurntableMgr::ButtonEventHandler(const bool state, const unsigned int data)
+
+void TurntableMgr::GraphicButtonHandler(byte buttonID, bool state)
 {
-	if (state)
+	if (state)        // button was pressed
 	{
-		currentSiding = data;
-		raiseEvent(BUTTON_SIDING);
-	}
-}
+		switch (buttonID)
+		{
+		case Touchpad::numpad0:
+		case Touchpad::numpad1:
+		case Touchpad::numpad2:
+		case Touchpad::numpad3:
+		case Touchpad::numpad4:
+		case Touchpad::numpad5:
+		case Touchpad::numpad6:
+		case Touchpad::numpad7:
+		case Touchpad::numpad8:
+		case Touchpad::numpad9:
+			if (currentPage == pageRun)
+			{
+				currentSiding = buttonID;
+				raiseEvent(BUTTON_SIDING);
+			}
 
+			// TODO: how do we want to handle pressing siding button while in setup mode?
+			
+			break;
+		case Touchpad::modeRun:
+			currentPage = pageRun;
+		case Touchpad::modeSetup:
+			currentPage = pageSetup;
+			break;
+		case Touchpad::runReverse:
+			break;
+		case Touchpad::setupCW:
+			break;
+		case Touchpad::setupCCW:
+			break;
+		case Touchpad::setupSet:
+			break;
+		case Touchpad::setupHome:
+			break;
+		default:
+			break;
+		}
+
+
+	}
+	else             // button was released
+	{
+
+	}
+
+}
 
 
 void TurntableMgr::StepperClockwiseStep()
