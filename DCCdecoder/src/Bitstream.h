@@ -117,8 +117,9 @@ the are received. After 32 bits have been stored, a callback is triggered, and t
 //#define TIMER1_HW_8PS    // use timer1 hardware irq with 8 prescaler
 //#define TIMER1_ICR_0PS   // use timer1 input capture register with no prescaler
 //define TIMER1_ICR_8PS   // use timer1 input capture register with 8 prescaler
-#define TIMER2_HW_8PS    // use timer2 hardware irq with 8 prescaler
+//#define TIMER2_HW_8PS    // use timer2 hardware irq with 8 prescaler
 //#define TIMER2_HW_32PS   // use timer2 hardware irq with 32 prescaler
+#define TIMER_ARM_HW_8PS   // use timer on arm with hardware irq with 8 prescaler
 
 // use standard DCC timings for ICR
 #if defined(TIMER1_ICR_0PS) || defined(TIMER1_ICR_8PS)
@@ -129,7 +130,7 @@ the are received. After 32 bits have been stored, a callback is triggered, and t
 #endif
 
 // use wider timings for hardware IRQ
-#if defined (TIMER1_HW_0PS) || defined(TIMER1_HW_8PS) || defined (TIMER2_HW_8PS) || defined(TIMER2_HW_32PS)
+#if defined (TIMER1_HW_0PS) || defined(TIMER1_HW_8PS) || defined (TIMER2_HW_8PS) || defined(TIMER2_HW_32PS) || defined(TIMER_ARM_HW_8PS)
 #define DCC_DEFAULT_ONE_MIN				48
 #define DCC_DEFAULT_ONE_MAX				68
 #define DCC_DEFAULT_ZERO_MIN			88
@@ -140,7 +141,7 @@ the are received. After 32 bits have been stored, a callback is triggered, and t
 #if defined(TIMER1_HW_0PS) || defined(TIMER1_ICR_0PS)
 #define CLOCK_SCALE_FACTOR 16U;   // no prescaler gives a 0.0625 us interval
 #endif
-#if defined(TIMER1_HW_8PS) || defined(TIMER1_ICR_8PS) || defined(TIMER2_HW_8PS)
+#if defined(TIMER1_HW_8PS) || defined(TIMER1_ICR_8PS) || defined(TIMER2_HW_8PS) || defined(TIMER_ARM_HW_8PS)
 #define CLOCK_SCALE_FACTOR 2U;    // 8 prescaler gives a 0.5 us interval
 #endif
 #if defined(TIMER2_HW_32PS)
@@ -184,7 +185,7 @@ private:
 	void HandleError();
 
 	// declare these as byte for 8 bit timers, unsigned int for 16 bit timers
-#if defined (TIMER1_HW_0PS) || defined(TIMER1_ICR_0PS) || defined(TIMER1_HW_8PS) || defined(TIMER1_ICR_8PS)
+#if defined (TIMER1_HW_0PS) || defined(TIMER1_ICR_0PS) || defined(TIMER1_HW_8PS) || defined(TIMER1_ICR_8PS) || defined(TIMER_ARM_HW_8PS)
 	unsigned int currentCount = 0;          // timer count for the last pulse
 	unsigned int period = 0;                // period of the current pulse
 	unsigned int lastInterruptCount = 0;    // Timer1 count at the last interrupt

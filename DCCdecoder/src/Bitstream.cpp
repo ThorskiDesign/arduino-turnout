@@ -132,7 +132,10 @@ void BitStream::Resume()
 	TCCR2B |= (1 << 1);
 	attachInterrupt(digitalPinToInterrupt(HWirqPin), GetTimestamp, CHANGE);   // enable h/w interrupt
 #endif
+#if defined(TIMER_ARM_HW_8PS)
+#endif
 
+	
 	interrupts();
 }
 
@@ -306,14 +309,19 @@ void BitStream::GetTimestamp()    // static
 #if defined(TIMER2_HW_8PS) || defined(TIMER2_HW_32PS)
 	const byte count = TCNT2;
 #endif
+#if defined(TIMER_ARM_HW_8PS)
+	const unsigned int count = 0;   // TODO: get real arm timer count here
+#endif
 
 	// timestamp assignment complete ~3 us after DCC state change
 
 	// check pinstate for change (TODO: why are there spurious IRQs here?
+	#if !defined(TIMER_ARM_HW_8PS)
 	const boolean pinState = HW_IRQ_PORT();                 // this takes ~0.2 us
 	if (pinState == lastPinState) return;
 	lastPinState = pinState;
-
+	#endif
+	
 	// add the timestamp to the queue
 	simpleQueue.Put(count);
 
@@ -322,6 +330,8 @@ void BitStream::GetTimestamp()    // static
 
 
 // get pulse timings using input capture register
+// TODO: use portable ISR macro so we don't have to ifdef this for compilation on arm
+#if defined(TIMER1_ICR_0PS) || defined(TIMER1_ICR_8PS)
 ISR(TIMER1_CAPT_vect)        // static, global
 {
 	const unsigned int capture = ICR1;    // store the capture register before we do anything else
@@ -329,3 +339,4 @@ ISR(TIMER1_CAPT_vect)        // static, global
 
 	BitStream::simpleQueue.Put(capture);      // add the value in the input capture register to the queue
 }
+#endif

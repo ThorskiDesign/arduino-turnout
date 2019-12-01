@@ -50,8 +50,9 @@ unsigned int SimpleQueue::Get()
 {
 	unsigned int returnVal = 0;
 
-	byte oldSREG = SREG;   // store the current irq state, then disable
-	cli();
+	//byte oldSREG = SREG;   // store the current irq state, then disable
+	//cli();
+	noInterrupts();
 
 	// if there are items in the queue
 	if (queueSize > 0)
@@ -66,8 +67,9 @@ unsigned int SimpleQueue::Get()
 		returnVal = values[readIndex];
 	}
 
-	SREG = oldSREG;    // restore previous irq state
-
+	//SREG = oldSREG;    // restore previous irq state
+	interrupts();
+	
 	return returnVal;
 }
 
@@ -77,12 +79,14 @@ byte SimpleQueue::Size()
 {
 	byte returnVal = 0;
 
-	byte oldSREG = SREG;   // store the current irq state, then disable
-	cli();
+	//byte oldSREG = SREG;   // store the current irq state, then disable
+	//cli();
+	noInterrupts();
 
 	returnVal = queueSize;
 
-	SREG = oldSREG;    // restore previous irq state
+	//SREG = oldSREG;    // restore previous irq state
+	interrupts();
 
 	return returnVal;
 }
@@ -91,9 +95,10 @@ byte SimpleQueue::Size()
 // reset the queue size and read/write counters.
 void SimpleQueue::Reset()
 {
-	byte oldSREG = SREG;   // store the current irq state, then disable
-	cli();
-
+	//byte oldSREG = SREG;   // store the current irq state, then disable
+	//cli();
+	noInterrupts();
+	
 	queueSize = 0;
 	readIndex = 0;
 	writeIndex = 0;
@@ -101,5 +106,6 @@ void SimpleQueue::Reset()
 	for (int i = 0; i < maxIndex + 1; i++)
 		values[i] = 0;
 
-	SREG = oldSREG;    // restore previous irq state
+	//SREG = oldSREG;    // restore previous irq state
+	interrupts();
 }
