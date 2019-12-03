@@ -26,9 +26,9 @@ A class to build and validate DCC packets from a bitstream.
 
 Summary:
 
-Building the DCC packets is initiated by calling the ProcessIncomingBits method, passing it a 
+Building the DCC packets is initiated by calling the ProcessIncomingBits method, passing it a
 long int containing 32 bits from the bitstream. The bits are processed in turn, starting with
-searching for the preamble, and then progressing to building the packets. After a complete 
+searching for the preamble, and then progressing to building the packets. After a complete
 packet is built, the Execute method is called, which performs a checksum, checks for repeat
 packets, and finally performs a callback with the completed packet. Callbacks provide error
 handling in the case of incorrect packet lengths or failed checksums.
@@ -52,7 +52,7 @@ if it has been repeated within a given time interval. If the packet passes both 
 a callback is performed with the completed packet. After a packet is built and executed, the Reset
 method resets the packet data and the state reverts to READPREAMBLE.
 
-The IsRepeatPacket method checks for repeat packets within a certain time interval, returning true 
+The IsRepeatPacket method checks for repeat packets within a certain time interval, returning true
 if a match is found. A log is maintained of recent packets. The log is updated on entry to the
 method to remove packets that are outside the specified time interval. Packets that are still within
 the time interval are moved toward the start of the log. This process not only removes old packets,
@@ -75,75 +75,80 @@ and its timestamp are added to the log, and the method returns false.
 
 
 // Min and max valid packet lengths
-#define PACKET_LEN_MIN              2   // zero indexed
-#define PACKET_LEN_MAX              5   // zero indexed
-#define PREAMBLE_MIN               10   // minimum number of 1's to signal valid preamble
-#define MAX_PACKET_LOG_SIZE        15   // max number of packets to check for repeats
-										// Note: the number of packets in the log is at least 1 for idle packets plus 1 for each engine
-										// with speed > 0, since the NCE sends them repeatedly. Did not seem to see anything over ~10-12
-										// in the log, even with 6 engines running and scrolling the thumbwheel.
+enum : byte
+{
+	PACKET_LEN_MIN = 2,         // zero indexed
+	PACKET_LEN_MAX = 5,         // zero indexed
+	PREAMBLE_MIN = 10,          // minimum number of 1's to signal valid preamble
+	MAX_PACKET_LOG_SIZE = 15,   // max number of packets to check for repeats
+								// Note: the number of packets in the log is at least 1 for idle packets plus 1 for each engine
+								// with speed > 0, since the NCE sends them repeatedly. Did not seem to see anything over ~10-12
+								// in the log, even with 6 engines running and scrolling the thumbwheel.
+};
 
 // error codes
-#define ERR_PACKET_TOO_LONG         1
-#define ERR_PACKET_TOO_SHORT        2
-#define ERR_FAILED_CHECKSUM         3
-#define ERR_EXCEEDED_HISTORY_SIZE   4
-
+enum : byte
+{
+	ERR_PACKET_TOO_LONG = 1,
+	ERR_PACKET_TOO_SHORT = 2,
+	ERR_FAILED_CHECKSUM = 3,
+	ERR_EXCEEDED_HISTORY_SIZE = 4,
+};
 
 
 class DCCpacket
 {
 
 public:
-    typedef void (*PacketCompleteHandler)(byte *Packet, byte PacketSize);
-    typedef void (*PacketErrorHandler)(byte ErrorCode);
+	typedef void(*PacketCompleteHandler)(byte *Packet, byte PacketSize);
+	typedef void(*PacketErrorHandler)(byte ErrorCode);
 
-    DCCpacket();
-    DCCpacket(bool EnableChecksum, bool FilterRepeats, unsigned int FilterInterval);
-    void ProcessIncomingBits(unsigned long incomingBits);
-    void SetPacketCompleteHandler(PacketCompleteHandler Handler);
-    void SetPacketErrorHandler(PacketErrorHandler Handler);
-    void EnableChecksum(bool Enable);
-    void FilterRepeatPackets(bool Filter);
+	DCCpacket();
+	DCCpacket(bool EnableChecksum, bool FilterRepeats, unsigned int FilterInterval);
+	void ProcessIncomingBits(unsigned long incomingBits);
+	void SetPacketCompleteHandler(PacketCompleteHandler Handler);
+	void SetPacketErrorHandler(PacketErrorHandler Handler);
+	void EnableChecksum(bool Enable);
+	void FilterRepeatPackets(bool Filter);
 
 private:
-    // states
-    enum State : byte
-    {
-        READPREAMBLE,
-        READPACKET,
-    };
+	// states
+	enum State : byte
+	{
+		READPREAMBLE,
+		READPACKET,
+	};
 
-    struct LogPacket
-    {
-        unsigned long packetTime;
-        byte packetSize;
-        byte packetData[PACKET_LEN_MAX + 1];
-   };
+	struct LogPacket
+	{
+		unsigned long packetTime;
+		byte packetSize;
+		byte packetData[PACKET_LEN_MAX + 1];
+	};
 
-    // private functions
-    void ReadPreamble();
-    void ReadPacket();
-    void Execute();
-    void Reset();
+	// private functions
+	void ReadPreamble();
+	void ReadPacket();
+	void Execute();
+	void Reset();
 	bool IsRepeatPacket();
 
-    // callback handlers
-    PacketCompleteHandler packetCompleteHandler = 0;
-    PacketErrorHandler packetErrorHandler = 0;
+	// callback handlers
+	PacketCompleteHandler packetCompleteHandler = 0;
+	PacketErrorHandler packetErrorHandler = 0;
 
-    // state and packet vars
-    unsigned long dataBits = 0;         // the source bit data
-    State state = READPREAMBLE;         // current processing state
-    byte packetIndex = 0;               // packet byte that we're on
-    byte packetMask = 0x80;             // mask for assigning bits to packet bytes
-    byte packet[PACKET_LEN_MAX + 1];    // packet data
+	// state and packet vars
+	unsigned long dataBits = 0;         // the source bit data
+	State state = READPREAMBLE;         // current processing state
+	byte packetIndex = 0;               // packet byte that we're on
+	byte packetMask = 0x80;             // mask for assigning bits to packet bytes
+	byte packet[PACKET_LEN_MAX + 1];    // packet data
 	bool currentBit = 0;                // the current bit extracted from the input stream
-    byte preambleBitCount = 0;          // count of consecutive 1's we've found while looking for preamble
+	byte preambleBitCount = 0;          // count of consecutive 1's we've found while looking for preamble
 
-    bool enableChecksum = true;                // require valid checksum in order to return packet
-    bool filterRepeatPackets = true;           // filter out repeated packets, sending only the first in the given interval
-    unsigned int filterInterval = 250;         // time period (ms) within which packets are considered repeats
+	bool enableChecksum = true;                // require valid checksum in order to return packet
+	bool filterRepeatPackets = true;           // filter out repeated packets, sending only the first in the given interval
+	unsigned int filterInterval = 250;         // time period (ms) within which packets are considered repeats
 	LogPacket packetLog[MAX_PACKET_LOG_SIZE];  // history of packets to check for repeats
 };
 

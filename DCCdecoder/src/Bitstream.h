@@ -18,7 +18,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-/* 
+/*
 
 DCC bitstream capture
 
@@ -28,31 +28,31 @@ http://www.nmra.org/sites/default/files/standards/sandrp/pdf/s-9.1_electrical_st
 Summary:
 
 A hardware interrupt or input capture register is configured so that each time the signal transitions,
-an ISR is called. In the ISR, the time of the interrupt in timer counts is stored in a queue. 
-When the timestamps are retrieved from the queue, the time between the current timestamp and the 
-previous timestamp is used to determine whether the current half of the bit indicates a 0 or a 1. 
-After a valid bit is found, it is added to an output queue. When the output queue is full, a callback 
+an ISR is called. In the ISR, the time of the interrupt in timer counts is stored in a queue.
+When the timestamps are retrieved from the queue, the time between the current timestamp and the
+previous timestamp is used to determine whether the current half of the bit indicates a 0 or a 1.
+After a valid bit is found, it is added to an output queue. When the output queue is full, a callback
 is performed to provide the data.
 
 Example usage:
 
-    BitStream bitStream();                              // create the bitstream object
-    bitStream.Resume();                                 // start the bitstream capture
+	BitStream bitStream();                              // create the bitstream object
+	bitStream.Resume();                                 // start the bitstream capture
 	bitStream.Suspend();                                // stop the bitstream capture
 	bitStream.ProcessTimeStamps();					    // process any DCC timestamps in the queue
 
 Details:
 
 Timestamps for the DCC signal transitions are captured and then inspected to determine if they
-represent a one or a zero bit. The caputure can be configured to use either the input capture 
-register or a hardware interrupt. In either case, the ISR is called on each transition of the DCC 
-signal and captures timestamps of the DCC events in a queue. The edge select bit of the capture 
-register is toggled each time in the ISR, so that both rising and falling edges are captured. The 
+represent a one or a zero bit. The caputure can be configured to use either the input capture
+register or a hardware interrupt. In either case, the ISR is called on each transition of the DCC
+signal and captures timestamps of the DCC events in a queue. The edge select bit of the capture
+register is toggled each time in the ISR, so that both rising and falling edges are captured. The
 hardware interrupt is similarly configured on CHANGE.
 
 Six combinations of interrupt type, timer, and prescaler are available. Different ISRs are used for
-hardware interrupt vs. the input capture register. Calcualtion of the pulse width is done using 
-unsigned int or byte depending on the selection of timer1 or timer2, so that overflows are handled 
+hardware interrupt vs. the input capture register. Calcualtion of the pulse width is done using
+unsigned int or byte depending on the selection of timer1 or timer2, so that overflows are handled
 correctly. A clock scale factor specifies the number of timer counts per microsecond and is set
 according to the selected prescaler. Standard DCC timings are used when using the input capture
 register. Slightly wider timings are more reliable for the hardware interrupt due to the effect of
@@ -61,22 +61,22 @@ other ISRs that may be running.
 The inspection of the timestamps is performed in three states. In the startup state, pulses are
 inspected to find the first valid half bit. After this, processing proceeds to the seek state, where
 the bits are examined for a transition from 1 to 0 or from 0 to 1, in order to establish which half bit
-of each pair is the ending half bit. At this point, the state is synced to the bitstream and normal 
-processing begins. In the normal mode, the timestamp queue is examined for a matching pair of half 
-bits that makes up a full bit. When a complete bit is found, it is added to the output queue. Error 
-checking is performed on each half bit. If a half bit does not fall within the valid ranges for a 
-0 or 1, a callback is triggered and a counter incremented. After a configurable number of consecutive 
-bit errors, another callback is triggered and processing reverts to the startup state. The bit error 
-count is reset after each complete bit. 
+of each pair is the ending half bit. At this point, the state is synced to the bitstream and normal
+processing begins. In the normal mode, the timestamp queue is examined for a matching pair of half
+bits that makes up a full bit. When a complete bit is found, it is added to the output queue. Error
+checking is performed on each half bit. If a half bit does not fall within the valid ranges for a
+0 or 1, a callback is triggered and a counter incremented. After a configurable number of consecutive
+bit errors, another callback is triggered and processing reverts to the startup state. The bit error
+count is reset after each complete bit.
 
 Suspend/Resume methods allow starting, stopping, or resetting the bitstream capture, depending
 on outside factors (for example, during times when the signal may be degraded, or when other higher
-priority processing needs to take place). The input capture or hardware interrupt is disabled when 
-suspended, and enabled when resumed. The timer is configured in the Resume method, so that it can be 
+priority processing needs to take place). The input capture or hardware interrupt is disabled when
+suspended, and enabled when resumed. The timer is configured in the Resume method, so that it can be
 used for other purposes (e.g. servo) when the bitstream capture is suspended.
 
 The output queue is an unsigned long, into which 32 bits are stored as they are received. The queue is
-shifted left each time a bit is added, so the bits are stored left to right in the order in which 
+shifted left each time a bit is added, so the bits are stored left to right in the order in which
 the are received. After 32 bits have been stored, a callback is triggered, and the queue is reset.
 
 */
@@ -106,65 +106,77 @@ the are received. After 32 bits have been stored, a callback is triggered, and t
 #define HW_DEBUG_PULSE_19_ON() PORTC = PORTC | (1 << 5)                                 // set pin 19 high
 #define HW_DEBUG_PULSE_19_OFF() PORTC = PORTC & ~(1 << 5)                               // set pin 19 low
 
-#define ERR_INVALID_HALF_BIT             1
-#define ERR_INVALID_HALF_BIT_LOW         2
-#define ERR_INVALID_HALF_BIT_MID         3
-#define ERR_INVALID_HALF_BIT_HIGH        4
-#define ERR_SEQUENTIAL_ERROR_LIMIT       10
+enum : byte
+{
+	ERR_INVALID_HALF_BIT = 1,
+	ERR_INVALID_HALF_BIT_LOW = 2,
+	ERR_INVALID_HALF_BIT_MID = 3,
+	ERR_INVALID_HALF_BIT_HIGH = 4,
+	ERR_SEQUENTIAL_ERROR_LIMIT = 10,
+};
 
 // set the timer/prescaler combination to use
 //#define TIMER1_HW_0PS    // use timer1 hardware irq with no prescaler
 //#define TIMER1_HW_8PS    // use timer1 hardware irq with 8 prescaler
 //#define TIMER1_ICR_0PS   // use timer1 input capture register with no prescaler
-//define TIMER1_ICR_8PS   // use timer1 input capture register with 8 prescaler
-//#define TIMER2_HW_8PS    // use timer2 hardware irq with 8 prescaler
+//#define TIMER1_ICR_8PS   // use timer1 input capture register with 8 prescaler
+#define TIMER2_HW_8PS    // use timer2 hardware irq with 8 prescaler
 //#define TIMER2_HW_32PS   // use timer2 hardware irq with 32 prescaler
-#define TIMER_ARM_HW_8PS   // use timer on arm with hardware irq with 8 prescaler
+//#define TIMER_ARM_HW_8PS   // use timer on arm with hardware irq with 8 prescaler
 
 // use standard DCC timings for ICR
 #if defined(TIMER1_ICR_0PS) || defined(TIMER1_ICR_8PS)
-#define DCC_DEFAULT_ONE_MIN				52
-#define DCC_DEFAULT_ONE_MAX				64
-#define DCC_DEFAULT_ZERO_MIN			90
-#define DCC_DEFAULT_ZERO_MAX			110    // 110 us for normal bit, 10000 us to allow zero-stretching
+enum : byte
+{
+	DCC_DEFAULT_ONE_MIN = 52,
+	DCC_DEFAULT_ONE_MAX = 64,
+	DCC_DEFAULT_ZERO_MIN = 90,
+	DCC_DEFAULT_ZERO_MAX = 110,     // 110 us for normal bit, 10000 us to allow zero-stretching
+};
 #endif
 
 // use wider timings for hardware IRQ
 #if defined (TIMER1_HW_0PS) || defined(TIMER1_HW_8PS) || defined (TIMER2_HW_8PS) || defined(TIMER2_HW_32PS) || defined(TIMER_ARM_HW_8PS)
-#define DCC_DEFAULT_ONE_MIN				48
-#define DCC_DEFAULT_ONE_MAX				68
-#define DCC_DEFAULT_ZERO_MIN			88
-#define DCC_DEFAULT_ZERO_MAX			120
+enum : byte
+{
+	DCC_DEFAULT_ONE_MIN = 48,
+	DCC_DEFAULT_ONE_MAX = 68,
+	DCC_DEFAULT_ZERO_MIN = 88,
+	DCC_DEFAULT_ZERO_MAX = 120,
+};
 #endif
 
+// TODO: convert these to enums, make sure data types are right
 // set clock scale factor based on prescaler (number of clock ticks per microsecond)
 #if defined(TIMER1_HW_0PS) || defined(TIMER1_ICR_0PS)
-#define CLOCK_SCALE_FACTOR 16U;   // no prescaler gives a 0.0625 us interval
+enum : uint16_t { CLOCK_SCALE_FACTOR = 16U };   // no prescaler gives a 0.0625 us interval
 #endif
+
 #if defined(TIMER1_HW_8PS) || defined(TIMER1_ICR_8PS) || defined(TIMER2_HW_8PS) || defined(TIMER_ARM_HW_8PS)
-#define CLOCK_SCALE_FACTOR 2U;    // 8 prescaler gives a 0.5 us interval
+enum : uint16_t { CLOCK_SCALE_FACTOR = 2U };    // 8 prescaler gives a 0.5 us interval
 #endif
+
 #if defined(TIMER2_HW_32PS)
-#define CLOCK_SCALE_FACTOR 0.5F;  // 32 prescaler gives a 2.0 us interval
+#define CLOCK_SCALE_FACTOR 0.5F  // 32 prescaler gives a 2.0 us interval
 #endif
 
 
 class BitStream
 {
 public:
-    typedef void (*DataFullHandler)(unsigned long BitData);
-    typedef void (*ErrorHandler)(byte ErrorCode);
+	typedef void(*DataFullHandler)(unsigned long BitData);
+	typedef void(*ErrorHandler)(byte ErrorCode);
 
 	// create the bitstream object
 	BitStream();
 
-    // configure the callback handlers
-    void SetDataFullHandler(DataFullHandler Handler);
-    void SetErrorHandler(ErrorHandler Handler);
+	// configure the callback handlers
+	void SetDataFullHandler(DataFullHandler Handler);
+	void SetErrorHandler(ErrorHandler Handler);
 
-    // suspend or resume the bitstream capture
-    void Suspend();
-    void Resume();
+	// suspend or resume the bitstream capture
+	void Suspend();
+	void Resume();
 
 	// process the raw timestamp queue
 	void ProcessTimestamps();
@@ -173,8 +185,11 @@ public:
 
 private:
 	// Hardware assignments
-	const byte HWirqPin = 2;
-	const byte ICRPin = 8;
+	enum : byte
+	{
+		HWirqPin = 2,
+		ICRPin = 8,
+	};
 
 	// state pointer and functions
 	typedef void(BitStream::*StateFunctionPointer)();
@@ -185,45 +200,48 @@ private:
 	void HandleError();
 
 	// declare these as byte for 8 bit timers, unsigned int for 16 bit timers
-#if defined (TIMER1_HW_0PS) || defined(TIMER1_ICR_0PS) || defined(TIMER1_HW_8PS) || defined(TIMER1_ICR_8PS) || defined(TIMER_ARM_HW_8PS)
+	#if defined (TIMER1_HW_0PS) || defined(TIMER1_ICR_0PS) || defined(TIMER1_HW_8PS) || defined(TIMER1_ICR_8PS) || defined(TIMER_ARM_HW_8PS)
 	unsigned int currentCount = 0;          // timer count for the last pulse
 	unsigned int period = 0;                // period of the current pulse
 	unsigned int lastInterruptCount = 0;    // Timer1 count at the last interrupt
-#endif
-#if defined(TIMER2_HW_8PS) || defined(TIMER2_HW_32PS)
+	#endif
+	#if defined(TIMER2_HW_8PS) || defined(TIMER2_HW_32PS)
 	byte currentCount = 0;          // timer count for the last pulse
 	byte period = 0;                // period of the current pulse
 	byte lastInterruptCount = 0;    // Timer1 count at the last interrupt
-#endif
+	#endif
 
-	// bitstream capture vars
+		// bitstream capture vars
 	boolean isOne = false;                  // pulse is within the limits for a 1
 	boolean isZero = false;                 // pulse is within the limits for a 0
 	boolean lastHalfBit = 0;                // the last half bit captured
 	boolean endOfBit = false;               // second half-bit indicator
 
 	// DCC microsecond 0 & 1 timings
-	const unsigned int timeOneMin = DCC_DEFAULT_ONE_MIN * CLOCK_SCALE_FACTOR;
-	const unsigned int timeOneMax = DCC_DEFAULT_ONE_MAX * CLOCK_SCALE_FACTOR;
-	const unsigned int timeZeroMin = DCC_DEFAULT_ZERO_MIN * CLOCK_SCALE_FACTOR;
-	const unsigned int timeZeroMax = DCC_DEFAULT_ZERO_MAX * CLOCK_SCALE_FACTOR;
+	enum : uint16_t
+	{
+		timeOneMin = DCC_DEFAULT_ONE_MIN * CLOCK_SCALE_FACTOR,
+		timeOneMax = DCC_DEFAULT_ONE_MAX * CLOCK_SCALE_FACTOR,
+		timeZeroMin = DCC_DEFAULT_ZERO_MIN * CLOCK_SCALE_FACTOR,
+		timeZeroMax = DCC_DEFAULT_ZERO_MAX * CLOCK_SCALE_FACTOR,
+	};
 
-    // Event handlers
-    DataFullHandler dataFullHandler = 0;    // handler for the data full event
-    ErrorHandler errorHandler = 0;          // handler for errors
+	// Event handlers
+	DataFullHandler dataFullHandler = 0;    // handler for the data full event
+	ErrorHandler errorHandler = 0;          // handler for errors
 
-    // Interrupt and error variables
-    byte bitErrorCount = 0;                 // current number of sequential bit errors
-    byte maxBitErrors = 5;                  // max number of bit errors before we revert to startup state
+	// Interrupt and error variables
+	byte bitErrorCount = 0;                 // current number of sequential bit errors
+	byte maxBitErrors = 5;                  // max number of bit errors before we revert to startup state
 	static boolean lastPinState;            // last state of the IRQ pin
 
-    // Output queue structure
-    const byte maxBitIndex = 31;            // 32 bits total to store in unsigned long
-    byte queueSize = 0;                     // current size of the queue
-    unsigned long bitData = 0;              // stores the bitstream
+	// Output queue structure
+	enum : byte { maxBitIndex = 31 };            // 32 bits total to store in unsigned long
+	byte queueSize = 0;                     // current size of the queue
+	unsigned long bitData = 0;              // stores the bitstream
 
-    // private methods
-    void QueuePut(boolean newBit);          // adds a bit to the queue
+	// private methods
+	void QueuePut(boolean newBit);          // adds a bit to the queue
 	static void GetTimestamp();		        // get and queue the timestamp from a hw interrupt
 };
 
