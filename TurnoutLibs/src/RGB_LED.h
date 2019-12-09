@@ -60,10 +60,12 @@ the flashing.
 class RgbLed
 {
 public:
-	enum ModeType {OFF, ON, FLASH};   // mode of the LED
-	enum ColorType {RED, GREEN, BLUE, YELLOW, CYAN, MAGENTA, WHITE};    // available colors
+	enum LedType : byte { SINGLE, RGB };
+	enum ModeType : byte {OFF, ON, FLASH};   // mode of the LED
+	enum ColorType : byte {RED, GREEN, BLUE, YELLOW, CYAN, MAGENTA, WHITE};    // available colors
 
 public:
+	RgbLed(byte Pin);
 	RgbLed(byte PinR, byte PinG, byte PinB);
 	void SetLED(bool State);
 	void SetLED(ColorType C, ModeType T);
@@ -88,8 +90,9 @@ private:
 	const bool greenState[7] = {LOW, HIGH, LOW, HIGH, HIGH, LOW, HIGH};
 	const bool blueState[7] = {LOW, LOW, HIGH, LOW, HIGH, HIGH, HIGH};
 
-	ModeType ledMode;		// type of LED
-	ColorType ledColor;     // color of LED
+	LedType ledType = RGB;
+	ModeType ledMode = OFF;		// type of LED
+	ColorType ledColor = WHITE;     // color of LED
 
 private:
 	void TurnColorsOn();

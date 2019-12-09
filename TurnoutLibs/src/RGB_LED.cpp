@@ -20,9 +20,24 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "RGB_LED.h"
 
-// Create a colored LED
+// Create a single LED
+RgbLed::RgbLed(byte Pin)
+{
+	ledType = SINGLE;
+
+	// assign from params
+	pinR = Pin;
+
+	// set up pin modes and initial led config
+	pinMode(pinR, OUTPUT);
+	SetLED(OFF);
+}
+
+// Create an RGB LED
 RgbLed::RgbLed(byte PinR, byte PinG, byte PinB)
 {
+	ledType = RGB;
+
 	// assign from params
 	pinR = PinR;
 	pinG = PinG;
@@ -95,15 +110,29 @@ void RgbLed::Update()
 // Turn on the individual elements as needed for the current color.
 void RgbLed::TurnColorsOn()
 {
-	digitalWrite(pinR, redState[ledColor]);
-	digitalWrite(pinG, greenState[ledColor]);
-	digitalWrite(pinB, blueState[ledColor]);
+	if (ledType == SINGLE)
+	{
+		digitalWrite(pinR, HIGH);
+	}
+	if (ledType == RGB)
+	{
+		digitalWrite(pinR, redState[ledColor]);
+		digitalWrite(pinG, greenState[ledColor]);
+		digitalWrite(pinB, blueState[ledColor]);
+	}
 }
 
 // Turn off the individual elements.
 void RgbLed::TurnColorsOff()
 {
-	digitalWrite(pinR, LOW);
-	digitalWrite(pinG, LOW);
-	digitalWrite(pinB, LOW);
+	if (ledType == SINGLE)
+	{
+		digitalWrite(pinR, LOW);
+	}
+	if (ledType == RGB)
+	{
+		digitalWrite(pinR, LOW);
+		digitalWrite(pinG, LOW);
+		digitalWrite(pinB, LOW);
+	}
 }
