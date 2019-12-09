@@ -14,12 +14,11 @@
 //#define WITH_DCC
 #define WITH_TOUCHSCREEN
 
-
 #include "Button.h"
 #include "EventTimer.h"
 #include "RGB_LED.h"
-#include <AccelStepper.h>
-#include <Adafruit_MotorShield.h>
+#include "AccelStepper.h"
+#include "Adafruit_MotorShield.h"
 
 #if defined(WITH_DCC)
 #include "DCCdecoder.h"
@@ -27,10 +26,18 @@
 
 #if defined(WITH_TOUCHSCREEN)
 #include "Touchpad.h"
-#include "Adafruit_ILI9341.h"
-#include <Adafruit_FT6206.h>
-#include <Wire.h>
+//#include "Adafruit_ILI9341.h"
+//#include <Adafruit_FT6206.h>
+//#include <Wire.h>
 #endif // WITH_TOUCHSCREEN
+
+#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
+#include "EEPROM.h"
+#endif
+
+#if defined (ADAFRUIT_METRO_M0_EXPRESS)
+#include "FlashStorage.h"
+#endif
 
 
 
@@ -68,7 +75,7 @@ private:
 		POWERED,        // stationary, with motor powered on, listening for dcc and touchscreen, flasher on
 		WARMUP,         // stationary but with pending move, dcc and touchscreen suspended, flasher on
 		MOVING,         // rotating, dcc and touchscreen suspended, flasher on
-		SEEK,       // seeking the hall sensor at high speed in the clockwise direction
+		SEEK,           // seeking the hall sensor at high speed in the clockwise direction
 	};
 
 	ttState currentState = IDLE;    // test - simulate power loss while moving
@@ -78,7 +85,7 @@ private:
 	typedef void(TurntableMgr::*StateFunctionPointer)();
 
 	//  keep this array in the same size/order as the ttState enum
-	StateFunctionPointer ttStateFunctions[6] =
+	StateFunctionPointer ttStateFunctions[5] =
 	{
 		&TurntableMgr::stateIdle,
 		&TurntableMgr::statePowered,
@@ -105,6 +112,7 @@ private:
 		MOVE_DONE,
 		IDLETIMER,
 		WARMUPTIMER,
+		BUTTON_SEEK,
 	};
 
 	void raiseEvent(ttEvent event);
@@ -125,7 +133,8 @@ private:
 		{ POWERED,        BUTTON_SIDING,     MOVING, },
 		{ POWERED,        IDLETIMER,         IDLE },
 		{ MOVING,         MOVE_DONE,         POWERED, },
-		{ SEEK,           MOVE_DONE,         POWERED },
+		{ SEEK,           MOVE_DONE,         IDLE },
+		{ IDLE,           BUTTON_SEEK,       SEEK},
 	};
 
 
@@ -138,7 +147,7 @@ private:
 	Button hallSensor{ hallSensorPin, true };
 	EventTimer idleTimer;
 	EventTimer warmupTimer;
-	RgbLed flasher{ LEDPin, LEDPin, LEDPin };    // single led.  TODO: update RGBLed to allow single led?
+	RgbLed flasher{ LEDPin };
 
 	enum : uint16_t
 	{
@@ -151,9 +160,10 @@ private:
 
 	#if defined(WITH_TOUCHSCREEN)
 	Touchpad touchpad;
+	#endif    // defined(WITH_TOUCHSCREEN)
+
 	enum : byte { pageRun, pageSetup };
 	byte currentPage = pageRun;
-	#endif    // defined(WITH_TOUCHSCREEN)
 
 
 	// stepper motor and related =================================================================
@@ -176,66 +186,85 @@ private:
 	AccelStepper accelStepper;
 
 	void configureStepper();
-	void moveToSiding(byte siding);
-	uint16_t findBasicPosition(int32_t pos);
-	int32_t findFullStep(int32_t microsteps);
+	void moveToSiding();
+	void reverseSiding();
+	static uint16_t findBasicPosition(int32_t pos);
+	static int32_t findFullStep(int32_t microsteps);
 
 
 	// DCC  ======================================================================================
 
 	#if defined(WITH_DCC)
-
 	DCCdecoder dcc;
+	#endif	// WITH_DCC
+
 	byte dccAddress = 1;     // the dcc address of the decoder
 
 	// define our available cv's  (allowable range 33-81 per 9.2.2)
-	// these are programmable via DCC like normal
-	const byte CV_AddressLSB = 1;
-	const byte CV_AddressMSB = 9;
-
-	// factory default settings
-	const byte CV_reset = 55;
-	const byte CV_softResetValue = 11;
-	const byte CV_hardResetValue = 55;
-
-	// set up default cv's
-	struct CVPair
+	enum : byte
 	{
-		const uint16_t  CV;
-		const uint8_t   Value;
-		const bool      SoftReset;
+		CV_AddressLSB = 1,
+		CV_AddressMSB = 9,
 	};
 
-	const CVPair FactoryDefaultCVs[2] =
+	// factory reset cv's
+	enum : byte
 	{
-		{ CV_AddressLSB, 1, false },
-		{ CV_AddressMSB, 0, false },
+		CV_reset = 55,
+		CV_softResetValue = 11,
+		CV_hardResetValue = 55,
 	};
 
-	#endif	// WITH_DCC
-
-
-	// TODO: clean up how we store the siding calibration
-	// set up 16 bit vars for eeprom storage
-	// these are not accessible or programmable via DCC, because they are 16 bit
-	const byte varStartAddress = 101;
-	const byte addrSiding1Steps = varStartAddress;
-	const byte addrSiding2Steps = varStartAddress + sizeof(uint16_t);
-	const byte addrSiding3Steps = varStartAddress + 2 * sizeof(uint16_t);
-
-	struct CV16bit
+	// set up cv's
+	struct CV
 	{
-		const uint16_t  address;
-		const uint16_t  Value;
-		const bool      SoftReset;
+		const byte cvNum;           // cv number
+		uint16_t cvValue;           // current cv value
+		const bool softReset;       // should this cv get reset during a soft reset
+		const uint16_t cvDefault;   // default value for the cv
 	};
 
-	const CV16bit FactoryDefaultSettings[3] =
+	enum : byte { numCVs = 2, numSidings = 10 };
+	struct ConfigVars
 	{
-		{ addrSiding1Steps, 0, false },
-		{ addrSiding2Steps, 1 * stepsPerSiding, false },
-		{ addrSiding2Steps, 2 * stepsPerSiding, false },
+		CV CVs[numCVs];
+		CV sidingSteps[numSidings];       // TODO: separate struct for these?
 	};
+
+	ConfigVars configVars =
+	{
+	{
+			{ CV_AddressLSB, 1, false, 1 },
+			{ CV_AddressMSB, 0, false, 0 },
+		},
+{
+			{ 0, 0, false, 0 * stepsPerSiding },
+			{ 0, 0, false, 1 * stepsPerSiding },
+			{ 0, 0, false, 2 * stepsPerSiding },
+			{ 0, 0, false, 3 * stepsPerSiding },
+			{ 0, 0, false, 4 * stepsPerSiding },
+			{ 0, 0, false, 5 * stepsPerSiding },
+			{ 0, 0, false, 6 * stepsPerSiding },
+			{ 0, 0, false, 7 * stepsPerSiding },
+			{ 0, 0, false, 8 * stepsPerSiding },
+			{ 0, 0, false, 9 * stepsPerSiding },
+		}
+	};
+
+	struct StateVars
+	{
+		ttState state;
+		byte currentSiding;
+	};
+
+	StateVars stateVars = { IDLE, 0 };
+
+	uint16_t getCV(byte cv);
+	void SaveConfig();
+	void SaveState();
+	void LoadConfig();
+	void LoadConfig(bool reset);
+	void LoadState();
 
 
 	// event handlers  ===========================================================================
