@@ -20,7 +20,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
 #include "Bitstream.h"
-#include "EEPROM.h"   // workaround for the way visual micro compiles libraries (?)
+//#include "EEPROM.h"   // workaround for the way visual micro compiles libraries (?)
 
 // global stuff
 BitStream bitStream;

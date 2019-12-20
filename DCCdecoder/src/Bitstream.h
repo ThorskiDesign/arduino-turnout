@@ -120,9 +120,9 @@ enum : byte
 //#define TIMER1_HW_8PS    // use timer1 hardware irq with 8 prescaler
 //#define TIMER1_ICR_0PS   // use timer1 input capture register with no prescaler
 //#define TIMER1_ICR_8PS   // use timer1 input capture register with 8 prescaler
-#define TIMER2_HW_8PS    // use timer2 hardware irq with 8 prescaler
+//#define TIMER2_HW_8PS    // use timer2 hardware irq with 8 prescaler
 //#define TIMER2_HW_32PS   // use timer2 hardware irq with 32 prescaler
-//#define TIMER_ARM_HW_8PS   // use timer on arm with hardware irq with 8 prescaler
+#define TIMER_ARM_HW_8PS   // use timer on arm with hardware irq with 8 prescaler
 
 // use standard DCC timings for ICR
 #if defined(TIMER1_ICR_0PS) || defined(TIMER1_ICR_8PS)
@@ -149,15 +149,19 @@ enum : byte
 // TODO: convert these to enums, make sure data types are right
 // set clock scale factor based on prescaler (number of clock ticks per microsecond)
 #if defined(TIMER1_HW_0PS) || defined(TIMER1_ICR_0PS)
-enum : uint16_t { CLOCK_SCALE_FACTOR = 16U };   // no prescaler gives a 0.0625 us interval
+enum : uint16_t { CLOCK_SCALE_FACTOR = 16U };   // no prescaler at 16 Mhz gives a 0.0625 us interval
 #endif
 
-#if defined(TIMER1_HW_8PS) || defined(TIMER1_ICR_8PS) || defined(TIMER2_HW_8PS) || defined(TIMER_ARM_HW_8PS)
-enum : uint16_t { CLOCK_SCALE_FACTOR = 2U };    // 8 prescaler gives a 0.5 us interval
+#if defined(TIMER1_HW_8PS) || defined(TIMER1_ICR_8PS) || defined(TIMER2_HW_8PS)
+enum : uint16_t { CLOCK_SCALE_FACTOR = 2U };    // 8 prescaler at 16 Mhz gives a 0.5 us interval
 #endif
 
 #if defined(TIMER2_HW_32PS)
-#define CLOCK_SCALE_FACTOR 0.5F  // 32 prescaler gives a 2.0 us interval
+#define CLOCK_SCALE_FACTOR 0.5F  // 32 prescaler at 16 Mhz gives a 2.0 us interval
+#endif
+
+#if defined(TIMER_ARM_HW_8PS)
+enum : uint16_t { CLOCK_SCALE_FACTOR = 6U };   // 8 prescaler at 48 MHz gives a 0.167 us interval
 #endif
 
 
@@ -243,6 +247,7 @@ private:
 	// private methods
 	void QueuePut(boolean newBit);          // adds a bit to the queue
 	static void GetTimestamp();		        // get and queue the timestamp from a hw interrupt
+	void ArmTimerSetup();
 };
 
 #endif

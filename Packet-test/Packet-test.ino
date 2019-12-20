@@ -49,7 +49,7 @@ static unsigned long lastMillis = millis();
 
 // global stuff
 BitStream bitStream;
-DCCpacket dccpacket(true, true, 250);
+DCCpacket dccpacket(true, false, 250);
 
 
 void BitStreamHandler(unsigned long incomingBits)

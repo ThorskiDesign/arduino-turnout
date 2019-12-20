@@ -133,9 +133,11 @@ void BitStream::Resume()
 	attachInterrupt(digitalPinToInterrupt(HWirqPin), GetTimestamp, CHANGE);   // enable h/w interrupt
 #endif
 #if defined(TIMER_ARM_HW_8PS)
+	ArmTimerSetup();
+	attachInterrupt(digitalPinToInterrupt(HWirqPin), GetTimestamp, CHANGE);   // enable h/w interrupt
 #endif
 
-	
+
 	interrupts();
 }
 
@@ -264,6 +266,12 @@ void BitStream::ProcessTimestamps()
 		// get the period between the current and last timestamps
 		period = currentCount - lastInterruptCount;
 
+		// TODO: why doesn't ARM subtraction overflow work like AVR above
+		#if defined(TIMER_ARM_HW_8PS)
+		if (currentCount < lastInterruptCount)
+			period = currentCount + (0xFFFF - lastInterruptCount);   // make sure we get the right period on overflow on ARM
+		#endif
+
 		// does the period give a 1 or a 0?
 		isOne = (period >= timeOneMin && period <= timeOneMax);
 		isZero = (period >= timeZeroMin && period <= timeZeroMax);
@@ -310,7 +318,9 @@ void BitStream::GetTimestamp()    // static
 	const byte count = TCNT2;
 #endif
 #if defined(TIMER_ARM_HW_8PS)
-	const unsigned int count = 0;   // TODO: get real arm timer count here
+	//TcCount16* TC = (TcCount16*) TC3;           // get the timer structure. TODO: get the real structure we need here.
+	//const unsigned int count = TC->COUNT.reg;
+	const unsigned int count = ((TcCount16*)TC3)->COUNT.reg;
 #endif
 
 	// timestamp assignment complete ~3 us after DCC state change
@@ -338,5 +348,35 @@ ISR(TIMER1_CAPT_vect)        // static, global
 	TCCR1B ^= 0x40;                 // toggle the edge select bit,  (1<<6) = 0x40
 
 	BitStream::simpleQueue.Put(capture);      // add the value in the input capture register to the queue
+}
+#endif
+
+
+#if defined(TIMER_ARM_HW_8PS)
+void BitStream::ArmTimerSetup()
+{
+	// initially from https://github.com/maxbader/arduino_tools/blob/master/libraries/timer_m0_tc_counter/timer_m0_tc_counter.ino#L22-L56
+	// see also servo.h for samd boards
+
+	// Enable clock for TC 
+	//REG_GCLK_CLKCTRL =  (uint16_t)(GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_GEN_GCLK0 | GCLK_CLKCTRL_ID(GCM_TCC2_TC3));
+	GCLK->CLKCTRL.reg = (uint16_t)(GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_GEN_GCLK0 | GCLK_CLKCTRL_ID(GCM_TCC2_TC3));
+	while (GCLK->STATUS.bit.SYNCBUSY == 1); // wait for sync 
+
+	// The type cast must fit with the selected timer mode 
+	TcCount16* TC = (TcCount16*)TC3; // get timer struct
+
+	TC->CTRLA.reg &= ~TC_CTRLA_ENABLE;   // Disable TCCx
+	while (TC->STATUS.bit.SYNCBUSY == 1); // wait for sync 
+
+	TC->CTRLA.reg |= TC_CTRLA_MODE_COUNT16;  // Set Timer counter Mode to 16 bits
+	while (TC->STATUS.bit.SYNCBUSY == 1); // wait for sync 
+
+	TC->CTRLA.reg |= TC_CTRLA_PRESCALER_DIV8;   // Set prescaler
+	while (TC->STATUS.bit.SYNCBUSY == 1); // wait for sync 
+
+	// Enable TC
+	TC->CTRLA.reg |= TC_CTRLA_ENABLE;
+	while (TC->STATUS.bit.SYNCBUSY == 1); // wait for sync 
 }
 #endif

@@ -65,7 +65,10 @@ TODO: The library currently only implements the most basic locomotive functional
 */
 
 
+#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
 #include "EEPROM.h"
+#endif
+
 #include "Bitstream.h"
 #include "DCCpacket.h"
 

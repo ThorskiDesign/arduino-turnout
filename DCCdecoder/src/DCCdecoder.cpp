@@ -70,7 +70,10 @@ void DCCdecoder::SetupDecoder(byte mfgID, byte mfgVers, byte cv29, boolean allPa
 // read a CV
 byte DCCdecoder::GetCV(int cv)
 {
+	#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
     if(cv >= kCV_PrimaryAddress && cv < kCV_MAX) return EEPROM.read(cv);
+	#endif
+	
     return 0;        
 }
 
@@ -88,6 +91,7 @@ boolean DCCdecoder::SetCV(int cv, byte newValue)
     // if cv is not valid, just return
     if (!CVIsValidForWrite(cv)) return false;
 
+	#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
     // is the value we're writing different from what is stored?
 	const byte currentValue = EEPROM.read(cv);
     if (newValue != currentValue)
@@ -97,6 +101,7 @@ boolean DCCdecoder::SetCV(int cv, byte newValue)
             cvUpdateHandler(cv, currentValue, newValue);
         return true;
     }
+	#endif
 
     // return false if we didn't update anything
     return false;
