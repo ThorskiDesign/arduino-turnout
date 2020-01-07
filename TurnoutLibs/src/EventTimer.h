@@ -48,7 +48,7 @@ public:
     typedef void (*EventTimerHandlerFunc)();
 
     EventTimer();
-	void StartTimer(unsigned int Duration);
+	void StartTimer(unsigned long Duration);
 	void Update(unsigned long CurrentMillis);
 	void Update();
 	bool IsActive();

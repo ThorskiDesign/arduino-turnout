@@ -28,7 +28,7 @@ EventTimer::EventTimer()
 
 
 // start a timer with the specified duration
-void EventTimer::StartTimer(unsigned int Duration)
+void EventTimer::StartTimer(unsigned long Duration)
 {
 	duration = Duration;
 	startTime = millis();
