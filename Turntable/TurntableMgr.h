@@ -11,7 +11,7 @@
 
 
 // build dcc and/or touchscreen control
-//#define WITH_DCC
+#define WITH_DCC
 #define WITH_TOUCHSCREEN
 
 #include "Button.h"
@@ -26,17 +26,12 @@
 
 #if defined(WITH_TOUCHSCREEN)
 #include "Touchpad.h"
-//#include "Adafruit_ILI9341.h"
-//#include <Adafruit_FT6206.h>
-//#include <Wire.h>
 #endif // WITH_TOUCHSCREEN
-
-#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
-#include "EEPROM.h"
-#endif
 
 #if defined (ADAFRUIT_METRO_M0_EXPRESS)
 #include "FlashStorage.h"
+#else
+#include "EEPROM.h"
 #endif
 
 
@@ -76,6 +71,7 @@ private:
 		WARMUP,         // stationary but with pending move, dcc and touchscreen suspended, flasher on
 		MOVING,         // rotating, dcc and touchscreen suspended, flasher on
 		SEEK,           // seeking the hall sensor at high speed in the clockwise direction
+		CALIBRATE,      // state for calibrating siding positions
 	};
 
 	ttState currentState = IDLE;    // test - simulate power loss while moving
@@ -85,13 +81,14 @@ private:
 	typedef void(TurntableMgr::*StateFunctionPointer)();
 
 	//  keep this array in the same size/order as the ttState enum
-	StateFunctionPointer ttStateFunctions[5] =
+	StateFunctionPointer ttStateFunctions[6] =
 	{
 		&TurntableMgr::stateIdle,
 		&TurntableMgr::statePowered,
 		&TurntableMgr::stateWarmup,
 		&TurntableMgr::stateMoving,
 		&TurntableMgr::stateSeek,
+		&TurntableMgr::stateCalibrate,
 	};
 
 	StateFunctionPointer currentStateFunction = 0;
@@ -102,17 +99,18 @@ private:
 	void stateWarmup();
 	void stateMoving();
 	void stateSeek();
+	void stateCalibrate();
 
 	// the state transition events
 	enum ttEvent : byte
 	{
-		NONE,
-		ANY,
-		BUTTON_SIDING,
-		MOVE_DONE,
 		IDLETIMER,
 		WARMUPTIMER,
+		MOVE_DONE,
+		BUTTON_SIDING,
 		BUTTON_SEEK,
+		BUTTON_CAL,
+		BUTTON_ESTOP,
 	};
 
 	void raiseEvent(ttEvent event);
@@ -125,16 +123,23 @@ private:
 		ttState nextState;
 	};
 
-	stateTransMatrixRow stateTransMatrix[7] =
+	stateTransMatrixRow stateTransMatrix[14] =
 	{
 		// CURR STATE     // EVENT           // NEXT STATE
-		{ IDLE,           BUTTON_SIDING,     WARMUP, },
 		{ WARMUP,         WARMUPTIMER,       MOVING },
-		{ POWERED,        BUTTON_SIDING,     MOVING, },
 		{ POWERED,        IDLETIMER,         IDLE },
-		{ MOVING,         MOVE_DONE,         POWERED, },
+		{ MOVING,         MOVE_DONE,         POWERED },
 		{ SEEK,           MOVE_DONE,         IDLE },
-		{ IDLE,           BUTTON_SEEK,       SEEK},
+		{ CALIBRATE,      MOVE_DONE,         POWERED },
+		{ IDLE,           BUTTON_SIDING,     WARMUP },
+		{ POWERED,        BUTTON_SIDING,     MOVING },
+		{ IDLE,           BUTTON_SEEK,       SEEK },
+		{ POWERED,        BUTTON_SEEK,       SEEK },
+		{ IDLE,           BUTTON_CAL,        CALIBRATE },
+		{ POWERED,        BUTTON_CAL,        CALIBRATE },
+		{ MOVING,         BUTTON_ESTOP,      IDLE },
+		{ POWERED,        BUTTON_ESTOP,      IDLE },
+		{ SEEK,           BUTTON_ESTOP,      IDLE },
 	};
 
 
@@ -142,7 +147,8 @@ private:
 	// Turntable locals  ========================================================================
 
 	byte currentSiding = 0;
-	byte lastSiding = 0;
+	byte previousSiding = 0;   // for debug purposes
+	uint16_t homePosition = 0;
 
 	Button hallSensor{ hallSensorPin, true };
 	EventTimer idleTimer;
@@ -151,9 +157,25 @@ private:
 
 	enum : uint16_t
 	{
-		idleTimeout = 5000,      // 5 sec, for testing
-		warmupTimeout = 5000,    // 5 sec
+		idleTimeout = 300,      // timeouts in seconds
+		warmupTimeout = 5,
 	};
+
+	struct MoveCmd
+	{
+		enum : byte { normal, reverse } type = normal;
+		uint16_t targetPos = 0;
+	};
+
+	MoveCmd moveCmd;
+
+	struct CalCmd
+	{
+		enum : byte { none, continuous, incremental } type = none;
+		int16_t calSteps = 0;
+	};
+
+	CalCmd calCmd;
 
 
 	// tft display and touchscreen setup   ========================================================
@@ -174,11 +196,10 @@ private:
 		stepperMicroSteps = 16,
 		ttGearRatio = 18,
 		motorShieldPort = 2,
-		stepperMaxSpeed = 500,
+		stepperMaxSpeed = 400,
 		stepperAcceleration = 25,
-		stepperLowSpeed = 50,
-		stepsPerSiding = ttGearRatio * stepperStepsPerRev * stepperMicroSteps / 36,  // for 10 degree spacing between sidings
-		halfCircleSteps = ttGearRatio * stepperStepsPerRev * stepperMicroSteps / 2,
+		stepperLowSpeed = 100,
+		stepsPerDegree = ttGearRatio * stepperStepsPerRev * stepperMicroSteps / 360,
 	};
 
 	Adafruit_MotorShield motorShield;
@@ -187,7 +208,8 @@ private:
 
 	void configureStepper();
 	void moveToSiding();
-	void reverseSiding();
+	void SetSidingCal();
+	void CommandHandler(byte buttonID, bool state);
 	static uint16_t findBasicPosition(int32_t pos);
 	static int32_t findFullStep(int32_t microsteps);
 
@@ -198,7 +220,7 @@ private:
 	DCCdecoder dcc;
 	#endif	// WITH_DCC
 
-	byte dccAddress = 1;     // the dcc address of the decoder
+	byte dccAddress = 50;     // the dcc address of the decoder
 
 	// define our available cv's  (allowable range 33-81 per 9.2.2)
 	enum : byte
@@ -218,46 +240,51 @@ private:
 	// set up cv's
 	struct CV
 	{
-		const byte cvNum;           // cv number
+		byte cvNum;           // cv number
 		uint16_t cvValue;           // current cv value
-		const bool softReset;       // should this cv get reset during a soft reset
-		const uint16_t cvDefault;   // default value for the cv
+		bool softReset;       // should this cv get reset during a soft reset
+		uint16_t cvDefault;   // default value for the cv
 	};
 
 	enum : byte { numCVs = 2, numSidings = 10 };
+
+public:       // these are public so we can use them with FlashStorage globals
 	struct ConfigVars
 	{
 		CV CVs[numCVs];
 		CV sidingSteps[numSidings];       // TODO: separate struct for these?
 	};
 
+	struct StateVars
+	{
+		ttState currentState;
+		byte currentSiding;
+		bool isValid;
+	};
+
+private:
 	ConfigVars configVars =
 	{
-	{
+		{
 			{ CV_AddressLSB, 1, false, 1 },
 			{ CV_AddressMSB, 0, false, 0 },
 		},
-{
-			{ 0, 0, false, 0 * stepsPerSiding },
-			{ 0, 0, false, 1 * stepsPerSiding },
-			{ 0, 0, false, 2 * stepsPerSiding },
-			{ 0, 0, false, 3 * stepsPerSiding },
-			{ 0, 0, false, 4 * stepsPerSiding },
-			{ 0, 0, false, 5 * stepsPerSiding },
-			{ 0, 0, false, 6 * stepsPerSiding },
-			{ 0, 0, false, 7 * stepsPerSiding },
-			{ 0, 0, false, 8 * stepsPerSiding },
-			{ 0, 0, false, 9 * stepsPerSiding },
+		{
+			{ 0, 0, false, 0 },   // set up default sidings to match current layout
+			{ 0, 0, false, 0 },
+			{ 0, 0, false, 13968 },
+			{ 0, 0, false, 12384 },
+			{ 0, 0, false, 10816 },
+			{ 0, 0, false, 9216 },
+			{ 0, 0, false, 7600 },
+			{ 0, 0, false, 6000 },
+			{ 0, 0, false, 15600 },
+			{ 0, 0, false, 0 },
 		}
 	};
 
-	struct StateVars
-	{
-		ttState state;
-		byte currentSiding;
-	};
+	StateVars stateVars = { IDLE, 0, false };
 
-	StateVars stateVars = { IDLE, 0 };
 
 	uint16_t getCV(byte cv);
 	void SaveConfig();
@@ -272,16 +299,24 @@ private:
 	// pointer to allow us to access member objects from callbacks
 	static TurntableMgr* currentInstance;
 
+	static void HallIrq();
+
 	// event handler functions
-	void GraphicButtonHandler(byte buttonID, bool state);
 	static void StepperClockwiseStep();
 	static void StepperCounterclockwiseStep();
 
 	// wrappers for callbacks
-	//static void WrapperHallSensorHandler(bool ButtonState);
 	static void WrapperIdleTimerHandler();
 	static void WrapperWarmupTimerHandler();
 	static void WrapperGraphicButtonHandler(byte buttonID, bool state);
+
+	// DCC event handler wrappers
+	static void WrapperDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte data);
+	static void WrapperDCCExtPacket(int boardAddress, int outputAddress, byte data);
+	static void WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byte instructionType, int cv, byte data);
+	static void WrapperMaxBitErrors(byte errorCode);
+	static void WrapperMaxPacketErrors(byte errorCode);
+	static void WrapperDCCDecodingError(byte errorCode);
 };
 
 #endif

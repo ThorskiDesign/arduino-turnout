@@ -4,6 +4,11 @@
 // static pointer for callbacks
 TurntableMgr* TurntableMgr::currentInstance = 0;
 
+#if defined(ADAFRUIT_METRO_M0_EXPRESS)
+FlashStorage(flashConfig, TurntableMgr::ConfigVars);
+FlashStorage(flashState, TurntableMgr::StateVars);
+#endif
+
 TurntableMgr::TurntableMgr()
 {
 	// pointer for callback functions
@@ -13,9 +18,9 @@ TurntableMgr::TurntableMgr()
 void TurntableMgr::Initialize()
 {
 	// load config and last saved state
-	LoadConfig();
 	LoadState();
-	
+	LoadConfig();
+
 	// setup the stepper
 	configureStepper();
 
@@ -23,19 +28,34 @@ void TurntableMgr::Initialize()
 	idleTimer.SetTimerHandler(WrapperIdleTimerHandler);
 	warmupTimer.SetTimerHandler(WrapperWarmupTimerHandler);
 
+	#if defined(WITH_DCC)
+	// Configure and initialize the DCC packet processor (accessory decoder in output address mode)
+	const byte cv29 = DCCdecoder::CV29_ACCESSORY_DECODER | DCCdecoder::CV29_OUTPUT_ADDRESS_MODE;
+	dcc.SetupDecoder(0, 0, cv29, false);
+	dcc.SetAddress(dccAddress);
+
+	// configure dcc event handlers
+	dcc.SetBasicAccessoryDecoderPacketHandler(WrapperDCCAccPacket);
+	dcc.SetExtendedAccessoryDecoderPacketHandler(WrapperDCCExtPacket);
+	dcc.SetBasicAccessoryPomPacketHandler(WrapperDCCAccPomPacket);
+	dcc.SetBitstreamMaxErrorHandler(WrapperMaxBitErrors);
+	dcc.SetPacketMaxErrorHandler(WrapperMaxPacketErrors);
+	dcc.SetDecodingErrorHandler(WrapperDCCDecodingError);
+	#endif
+
 	#if defined(WITH_TOUCHSCREEN)
 	touchpad.Init();
 	touchpad.SetGraphicButtonHandler(WrapperGraphicButtonHandler);
 	#endif // defined(WITH_TOUCHSCREEN)
 
 	// start the state machine
-	if (currentState == MOVING || currentState == SEEK)
-		// we shutdown without reaching our destination, so stepper position is unknown
-	{
-		currentState = SEEK;
-		currentStateFunction = &TurntableMgr::stateSeek;
-	}
-	else
+	//if (currentState == MOVING || currentState == SEEK)
+	//	// we shutdown without reaching our destination, so stepper position is unknown
+	//{
+	//	currentState = SEEK;
+	//	currentStateFunction = &TurntableMgr::stateSeek;
+	//}
+	//else
 		// normal startup
 	{
 		currentState = IDLE;
@@ -92,6 +112,8 @@ void TurntableMgr::stateMoving()
 		dcc.SuspendBitstream();
 		#endif   // WITH_DCC
 
+		flasher.SetLED(RgbLed::RED, RgbLed::FLASH);
+
 		// move to the specified siding at normal speed
 		accelStepper.setMaxSpeed(stepperMaxSpeed);
 		accelStepper.setAcceleration(stepperAcceleration);
@@ -109,11 +131,18 @@ void TurntableMgr::stateMoving()
 	touchpad.Update();
 	#endif // defined(WITH_TOUCHSCREEN)
 
-	if (accelStepper.distanceToGo() == 0) raiseEvent(MOVE_DONE);
+	if (accelStepper.distanceToGo() == 0)    // move is done
+	{
+		SaveState();    // TODO: add checks here to minimize flash/eeprom writes
+						// TODO: need to save current siding, but this is the wrong place to save state
+		raiseEvent(MOVE_DONE);
+	}
 }
 
 void TurntableMgr::stateSeek()
 {
+	hallSensor.Update();
+
 	switch (subState)
 	{
 	case 0:                 // transition to seek state
@@ -122,80 +151,118 @@ void TurntableMgr::stateSeek()
 		dcc.SuspendBitstream();
 		#endif
 
-		flasher.SetLED(RgbLed::RED, RgbLed::FLASH);
-
 		// start moving in a complete clockwise circle at normal speed
-		accelStepper.setMaxSpeed(stepperMaxSpeed);
+		accelStepper.setMaxSpeed(stepperMaxSpeed / 2);
 		accelStepper.setAcceleration(stepperAcceleration);
-		accelStepper.move(2 * halfCircleSteps);
+		accelStepper.move(360 * stepsPerDegree);
+
+		attachInterrupt(digitalPinToInterrupt(hallSensorPin), HallIrq, RISING);
 
 		subState = 1;
 		break;
 	case 1:    // CW rotation, waiting for hall sensor to go low, indicating magnet has entered its detection area
-		if (!hallSensor.SwitchState()) subState = 2;   // found it, go to next state
-		break;
-	case 2:    // CW rotation, waiting for sensor to go high, indicating we've swung past in the CW direction
-		if (hallSensor.SwitchState())
+		if (!hallSensor.SwitchState())
 		{
-			accelStepper.stop();     // set the stepper to stop with its current speed/accel settings
-			subState = 3;
+			flasher.SetLED(RgbLed::RED, RgbLed::ON);
+			subState = 2;   // found it, go to next state
 		}
 		break;
-	case 3:    // waiting for CW motion to stop
+	case 2:    // CW rotation, waiting for IRQ callback to set subState = 3
+		//if (hallSensor.SwitchState()) 
+		//{
+		//	homePosition = findFullStep(accelStepper.currentPosition());
+		//	subState = 3;
+		//}
+		break;
+	case 3:    // now we've swung past in the CW direction and our home position is set (in the IRQ)
+		flasher.SetLED(RgbLed::RED, RgbLed::OFF);
+		detachInterrupt(digitalPinToInterrupt(hallSensorPin));
+		accelStepper.stop();     // set the stepper to stop with its current speed/accel settings
+		subState = 4;
+		break;
+	case 4:    // waiting for CW motion to stop
 		if (accelStepper.distanceToGo() == 0)
 		{
-			// start moving in a counter clockwise halfcircle at low speed
-			accelStepper.setMaxSpeed(stepperLowSpeed);
-			accelStepper.setAcceleration(stepperAcceleration);
-			accelStepper.move(-1L * halfCircleSteps);
-
-			subState = 4;
+			// now that we have stopped, set our home position
+			int16_t delta = accelStepper.currentPosition() - homePosition;
+			accelStepper.setCurrentPosition(delta);
 		}
-		break;
-	case 4:    //  CCW rotation, waiting for sensor to go low
-		if (!hallSensor.SwitchState()) subState = 5;
-		break;
-	case 5:    //  CCW rotation, waiting for sensor to go high
-		if (hallSensor.SwitchState())
-		{
-			accelStepper.setCurrentPosition(0);    // we found our zero position, so set it
-												   // TODO: use the nearest full step value
-			//accelStepper.stop();                   // set the stepper to stop with its current speed/accel settings
-
-			subState = 6;
-		}
-		break;
-		//case 6:   // CCW rotation, waiting for motion to stop
-		//	if (accelStepper.distanceToGo() == 0)
-		//		raiseEvent(MOVE_DONE);      // motion has stopped, raise event to exit seek state
-		//	break;
-	default:
 		break;
 	}
 
-	// TODO: add timeout/error check in case we somehow miss one of the substate steps
 	// When we stop after substate 5, or if we miss a hall sensor event and go full circle, end the move
 	if (accelStepper.distanceToGo() == 0)
 		raiseEvent(MOVE_DONE);      // motion has stopped, raise event to exit seek state
 
 	// do the update functions for this state
+	//hallSensor.Update();
+	accelStepper.run();
+	//hallSensor.Update();
+	//flasher.Update();
+}
+
+
+void TurntableMgr::stateCalibrate()
+{
+	if (subState == 0)     // transition to state
+	{
+
+		flasher.SetLED(RgbLed::RED, RgbLed::FLASH);
+
+		#if defined(WITH_DCC)
+		dcc.SuspendBitstream();
+		#endif   // WITH_DCC
+
+		accelStepper.setMaxSpeed(stepperMaxSpeed);
+		accelStepper.setAcceleration(10 * stepperAcceleration);
+
+		subState = 1;
+	}
+
+	// do the update functions for this state
 	uint32_t currentMillis = millis();
 	accelStepper.run();
 	flasher.Update(currentMillis);
-	hallSensor.Update(currentMillis);
+
+	#if defined(WITH_TOUCHSCREEN)
+	touchpad.Update();
+	#endif // defined(WITH_TOUCHSCREEN)
+
+	// if the current move is done, then set up the next cal move, or exit
+	if (accelStepper.distanceToGo() == 0)
+	{
+		switch (calCmd.type)
+		{
+		case CalCmd::none:
+			raiseEvent(MOVE_DONE);
+			break;
+		case CalCmd::continuous:
+			accelStepper.move(calCmd.calSteps);
+			break;
+		case CalCmd::incremental:
+			accelStepper.move(calCmd.calSteps);
+			calCmd.type = CalCmd::none;
+			break;
+		default:
+			break;
+		}
+	}
 }
+
 
 void TurntableMgr::statePowered()
 {
 	if (subState == 0)     // transition to state
 	{
 
+		flasher.SetLED(RgbLed::ON);         // turn off the warning light
+
 		#if defined(WITH_DCC)
 		dcc.ResumeBitstream();               // resume listening for dcc commands
 		#endif // deinfed(WITH_DCC)
 
 		// start the timer for the transition to idle state
-		idleTimer.StartTimer(idleTimeout);
+		idleTimer.StartTimer(1000UL * idleTimeout);
 		subState = 1;
 	}
 
@@ -226,7 +293,7 @@ void TurntableMgr::stateWarmup()
 		flasher.SetLED(RgbLed::RED, RgbLed::FLASH);
 
 		// start the timer for the transition to moving state
-		warmupTimer.StartTimer(warmupTimeout);
+		warmupTimer.StartTimer(1000UL * warmupTimeout);
 		flasher.SetLED(RgbLed::RED, RgbLed::FLASH);
 		subState = 1;
 	}
@@ -274,46 +341,40 @@ void TurntableMgr::configureStepper()
 	// accelstepper setup
 	accelStepper.setMaxSpeed(stepperMaxSpeed);
 	accelStepper.setAcceleration(stepperAcceleration);
+
+	// set stepper position to correspond to current siding
+	accelStepper.setCurrentPosition(configVars.sidingSteps[currentSiding].cvValue);
 }
 
 
 void TurntableMgr::moveToSiding()
 {
 	// get stepper position for desired siding
-	const int32_t targetPos = configVars.sidingSteps[currentSiding].cvValue;
+	const int32_t targetPos = moveCmd.targetPos;  // put into int32 for later calcs
 
 	// get current stepper position in positive half circle equivalent
 	const uint16_t currentPos = findBasicPosition(accelStepper.currentPosition());
 
-	// now figure out the shortest rotation
-	const int32_t deltaCW = targetPos - currentPos;
-	const int32_t deltaCCW = (targetPos - halfCircleSteps) - currentPos;
+	// steps needed for move (go in opposite direction if ouside +/-90 deg)
+	int32_t moveSteps = targetPos - currentPos;
+	if (moveSteps > 90L * stepsPerDegree) moveSteps -= 180L * stepsPerDegree;
+	if (moveSteps < -90L * stepsPerDegree) moveSteps += 180L * stepsPerDegree;
 
-	// nothing to do, just return
-	if (deltaCW == 0 || deltaCCW == 0) return;
-
-	// start the move
-	if (abs(deltaCW) < abs(deltaCCW))
+	// update steps for reverse move if needed
+	if (moveCmd.type == MoveCmd::reverse)
 	{
-		accelStepper.move(deltaCW);
+		if (moveSteps > 0) 
+			moveSteps -= 180L * stepsPerDegree;
+		else
+			moveSteps += 180L * stepsPerDegree;
 	}
-	else
-	{
-		accelStepper.move(deltaCCW);
-	}
-}
 
+	moveCmd.type = MoveCmd::normal;    // reset for normal move if it was reversed
 
-void TurntableMgr::reverseSiding()
-{
-	// get current stepper position in positive half circle equivalent
-	const uint16_t currentPos = findBasicPosition(accelStepper.currentPosition());
+	// do the move
+	if (moveSteps != 0) accelStepper.move(moveSteps);
 
-	// add a half circle of steps to that
-	const uint16_t targetPos = currentPos + halfCircleSteps;
-
-	// start the move
-	accelStepper.moveTo(targetPos);
+	previousSiding = currentSiding;   // for debug purposes
 }
 
 
@@ -321,6 +382,7 @@ void TurntableMgr::reverseSiding()
 uint16_t TurntableMgr::findBasicPosition(int32_t pos)
 {
 	int32_t p = pos;
+	const uint16_t halfCircleSteps = 180 * stepsPerDegree;
 
 	if (p < 0)     // convert negative motor position
 	{
@@ -342,7 +404,7 @@ int32_t TurntableMgr::findFullStep(int32_t microsteps)
 	}
 	else
 	{
-		return microsteps + (stepperMicroSteps - remainder);
+		return microsteps - remainder + stepperMicroSteps;
 	}
 }
 
@@ -355,7 +417,33 @@ void TurntableMgr::WrapperWarmupTimerHandler() { currentInstance->raiseEvent(WAR
 
 void TurntableMgr::WrapperGraphicButtonHandler(byte buttonID, bool state)
 {
-	currentInstance->GraphicButtonHandler(buttonID, state);
+	currentInstance->CommandHandler(buttonID, state);
+}
+
+void TurntableMgr::WrapperDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte data)
+{
+	if (data == 1) currentInstance->CommandHandler(1, true);    // accessory command for siding 1
+}
+
+void TurntableMgr::WrapperDCCExtPacket(int boardAddress, int outputAddress, byte data)
+{
+	currentInstance->CommandHandler(data, true);
+}
+
+void TurntableMgr::WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byte instructionType, int cv, byte data)
+{
+}
+
+void TurntableMgr::WrapperMaxBitErrors(byte errorCode)
+{
+}
+
+void TurntableMgr::WrapperMaxPacketErrors(byte errorCode)
+{
+}
+
+void TurntableMgr::WrapperDCCDecodingError(byte errorCode)
+{
 }
 
 
@@ -368,14 +456,22 @@ uint16_t TurntableMgr::getCV(byte cv)
 
 void TurntableMgr::SaveConfig()
 {
-	#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
+	#if defined(ADAFRUIT_METRO_M0_EXPRESS)
+	flashConfig.write(configVars);
+	#else
 	EEPROM.put(sizeof(stateVars), configVars);   // store the config vars struct starting after the state vars in EEPROM
 	#endif
 }
 
 void TurntableMgr::SaveState()
 {
-	#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
+	stateVars.currentState = currentState;
+	stateVars.currentSiding = currentSiding;
+	stateVars.isValid = true;
+
+	#if defined(ADAFRUIT_METRO_M0_EXPRESS)
+	flashState.write(stateVars);
+	#else
 	EEPROM.put(0, stateVars);
 	#endif
 }
@@ -387,43 +483,93 @@ void TurntableMgr::LoadConfig()
 
 void TurntableMgr::LoadConfig(bool reset)
 {
-	#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
-	const bool firstBoot = (EEPROM.read(0) == 255);
-	if (firstBoot || reset)   // if this is the first boot on fresh eeprom, or reset requested
+	#if defined(ADAFRUIT_METRO_M0_EXPRESS)
+	const bool firstBoot = !stateVars.isValid;   //  isValid should be false on first boot, but
+												 //  must load state from flash before loading config
+	#else
+	const bool firstBoot = (EEPROM.read(0) == 255);    // default value for unwritten eeprom
+	#endif
+
+	if (firstBoot || reset)   // if this is the first boot on fresh eeprom/flash, or reset requested
 	{
+
 		//load default values for config vars and sidings
 		for (byte i = 0; i < numCVs; i++)
 			configVars.CVs[i].cvValue = configVars.CVs[i].cvDefault;
 		for (byte i = 0; i < numSidings; i++)
 			configVars.sidingSteps[i].cvValue = configVars.sidingSteps[i].cvDefault;
+
+		SaveState();
+		SaveConfig();
 	}
 	else
 	{
+
+		#if defined(ADAFRUIT_METRO_M0_EXPRESS)
+		configVars = flashConfig.read();
+		#else
 		EEPROM.get(sizeof(stateVars), configVars);   // load the config vars struct starting after the state vars in EEPROM
+		#endif
 	}
-	#endif
+
 }
 
 void TurntableMgr::LoadState()
 {
-	#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
+	#if defined(ADAFRUIT_METRO_M0_EXPRESS)
+	StateVars tempStateVars = flashState.read();
+	const bool firstBoot = !tempStateVars.isValid;
+	#else
 	const bool firstBoot = (EEPROM.read(0) == 255);
-	if (!firstBoot)
-	{
-		EEPROM.get(0, stateVars);    // get the last state from eeprom
-	}
 	#endif
+
+	if (!firstBoot)   // if not first boot, then load stored state, otherwise use stateVars default initializations
+	{
+
+		#if defined(ADAFRUIT_METRO_M0_EXPRESS)
+		stateVars = tempStateVars;
+		#else
+		EEPROM.get(0, stateVars);    // get the last state from eeprom
+		#endif // defined(ADAFRUIT_METRO_M0_EXPRESS)
+
+		currentState = stateVars.currentState;
+		currentSiding = stateVars.currentSiding;
+
+	}
+	else
+	{
+
+	}
 }
 
 
-void TurntableMgr::GraphicButtonHandler(byte buttonID, bool state)
+void TurntableMgr::SetSidingCal()
+{
+	// update the siding position in our cv struct
+	long pos = accelStepper.currentPosition();
+	uint16_t basicPos = findBasicPosition(pos);
+	int32_t fullstepPos = findFullStep(basicPos);
+	configVars.sidingSteps[currentSiding].cvValue = fullstepPos;
+
+	// store the turntable state and cv struct to nvram
+	SaveConfig();
+}
+
+
+void TurntableMgr::HallIrq()
+{
+	currentInstance->homePosition = findFullStep(currentInstance->accelStepper.currentPosition());
+	currentInstance->subState = 3;   //  for seek state 3 to begin slowing down
+}
+
+
+void TurntableMgr::CommandHandler(byte buttonID, bool state)
 {
 
 	if (state)        // button was pressed
 	{
 		switch (buttonID)
 		{
-		case Touchpad::numpad0:
 		case Touchpad::numpad1:
 		case Touchpad::numpad2:
 		case Touchpad::numpad3:
@@ -433,14 +579,9 @@ void TurntableMgr::GraphicButtonHandler(byte buttonID, bool state)
 		case Touchpad::numpad7:
 		case Touchpad::numpad8:
 		case Touchpad::numpad9:
-			if (currentPage == pageRun)
-			{
-				currentSiding = buttonID;
-				raiseEvent(BUTTON_SIDING);
-			}
-
-			// TODO: how do we want to handle pressing siding button while in setup mode?
-
+			currentSiding = buttonID;
+			moveCmd.targetPos = configVars.sidingSteps[currentSiding].cvValue;
+			raiseEvent(BUTTON_SIDING);
 			break;
 		case Touchpad::modeRun:
 			currentPage = pageRun;
@@ -449,27 +590,78 @@ void TurntableMgr::GraphicButtonHandler(byte buttonID, bool state)
 			currentPage = pageSetup;
 			break;
 		case Touchpad::runReverse:
+			moveCmd.type = MoveCmd::reverse;  // this gets reset after the reverse move is complete
+			//moveCmd.targetPos = configVars.sidingSteps[currentSiding].cvValue;
+			//raiseEvent(BUTTON_SIDING);
 			break;
-		case Touchpad::setupCW:
+
+		// calibration commands
+		case Touchpad::setupStepCW:
+			calCmd.type = CalCmd::continuous;
+			calCmd.calSteps = stepperMicroSteps;
+			raiseEvent(BUTTON_CAL);
 			break;
-		case Touchpad::setupCCW:
+		case Touchpad::setupStepCCW:
+			calCmd.type = CalCmd::continuous;
+			calCmd.calSteps = -1L * stepperMicroSteps;
+			raiseEvent(BUTTON_CAL);
 			break;
+		case Touchpad::setup10CW:
+			calCmd.type = CalCmd::incremental;
+			calCmd.calSteps = 10 * stepsPerDegree;
+			raiseEvent(BUTTON_CAL);
+			break;
+		case Touchpad::setup10CCW:
+			calCmd.type = CalCmd::incremental;
+			calCmd.calSteps = -10L * stepsPerDegree;
+			raiseEvent(BUTTON_CAL);
+			break;
+		case Touchpad::setup30CW:
+			calCmd.type = CalCmd::incremental;
+			calCmd.calSteps = 30 * stepsPerDegree;
+			raiseEvent(BUTTON_CAL);
+			break;
+		case Touchpad::setup30CCW:
+			calCmd.type = CalCmd::incremental;
+			calCmd.calSteps = -30L * stepsPerDegree;
+			raiseEvent(BUTTON_CAL);
+			break;
+		case Touchpad::setup90CW:
+			calCmd.type = CalCmd::incremental;
+			calCmd.calSteps = 90 * stepsPerDegree;
+			raiseEvent(BUTTON_CAL);
+			break;
+		case Touchpad::setup90CCW:
+			calCmd.type = CalCmd::incremental;
+			calCmd.calSteps = -90L * stepsPerDegree;
+			raiseEvent(BUTTON_CAL);
+			break;
+
+
 		case Touchpad::setupSet:
+			SetSidingCal();
 			break;
 		case Touchpad::setupHome:
 			raiseEvent(BUTTON_SEEK);
 			break;
+		case Touchpad::estop:
+			raiseEvent(BUTTON_ESTOP);
+			break;
 		default:
 			break;
 		}
-
-
 	}
 	else             // button was released
 	{
-
+		switch (buttonID)
+		{
+		case Touchpad::setupStepCW:
+		case Touchpad::setupStepCCW:
+			calCmd.type = CalCmd::none;
+		default:
+			break;
+		}
 	}
-
 }
 
 
