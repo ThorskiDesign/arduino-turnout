@@ -143,18 +143,38 @@ void Touchpad::ConfigureRunPage()
 {
 	display.fillScreen(white);
 
-	ConfigureNumpad();
-
-	// mode buttons
-	button[9].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (0 * 100) + 20, (0 * 50) + 10, 90, 40, "Run", modeRun);
-	button[9].Press(true);
-	button[10].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (1 * 100) + 20, (0 * 50) + 10, 90, 40, "Setup", modeSetup);
+	// siding buttons
+	byte xs = 70;
+	byte ys = 50;
+	byte xoff = 20;
+	byte yoff = 20;
+	button[0].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (2 * ys) + yoff, 60, 40, "1", numpad1);
+	button[1].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (1 * xs) + xoff, (2 * ys) + yoff, 60, 40, "2", numpad2);
+	button[2].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (2 * xs) + xoff, (2 * ys) + yoff, 60, 40, "3", numpad3);
+	button[3].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (3 * ys) + yoff, 60, 40, "4", numpad4);
+	button[4].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (1 * xs) + xoff, (3 * ys) + yoff, 60, 40, "5", numpad5);
+	button[5].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (2 * xs) + xoff, (3 * ys) + yoff, 60, 40, "6", numpad6);
+	button[6].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (4 * ys) + yoff, 60, 40, "7", numpad7);
+	button[7].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (1 * xs) + xoff, (4 * ys) + yoff, 60, 40, "8", numpad8);
+	button[8].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (2 * xs) + xoff, (4 * ys) + yoff, 60, 40, "9", numpad9);
 
 	// reverse button
-	button[11].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, 20, (5 * 50) + 5, 200, 40, "Reverse", runReverse);
+	button[12].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (5 * ys) + yoff, 200, 40, "Reverse", runReverse);
+
+	// mode buttons
+	xs = 110;
+	ys = 50;
+	xoff = 20;
+	yoff = 10;
+	button[9].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (0 * ys) + yoff, 90, 40, "Run", modeRun);
+	button[10].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (1 * xs) + xoff, (0 * ys) + yoff, 90, 40, "Setup", modeSetup);
+	button[9].Press(true);
+
+	// emergency stop button
+	button[11].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (1 * xs) + xoff, (1 * ys) + yoff, 90, 40, "EStop", estop);
 
 	// deactivate unused buttons
-	for (byte i = 12; i < numButtons; i++)
+	for (byte i = 13; i < numButtons; i++)
 		button[i].SetActive(false);
 
 	for (auto& b : button)
@@ -165,54 +185,48 @@ void Touchpad::ConfigureSetupPage()
 {
 	display.fillScreen(white);
 
-	ConfigureNumpad();
+	// calibration buttons
+	byte xs = 70;
+	byte ys = 50;
+	byte xoff = 20;
+	byte yoff = 20;
+	button[0].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (2 * ys) + yoff, 60, 40, "+10", setup10CW);
+	button[1].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (2 * xs) + xoff, (2 * ys) + yoff, 60, 40, "-10", setup10CCW);
+	button[2].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (3 * ys) + yoff, 60, 40, "+30", setup30CW);
+	button[3].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (2 * xs) + xoff, (3 * ys) + yoff, 60, 40, "-30", setup30CCW);
+	button[4].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (4 * ys) + yoff, 60, 40, "+90", setup90CW);
+	button[5].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (2 * xs) + xoff, (4 * ys) + yoff, 60, 40, "-90", setup90CCW);
+	button[6].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (5 * ys) + yoff, 60, 40, "CW", setupStepCW);
+	button[7].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (1 * xs) + xoff, (5 * ys) + yoff, 60, 40, "Set", setupSet);
+	button[8].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (2 * xs) + xoff, (5 * ys) + yoff, 60, 40, "CCW", setupStepCCW);
 
 	// mode buttons
-	button[9].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (0 * 100) + 20, (0 * 50) + 10, 90, 40, "Run", modeRun);
-	button[10].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (1 * 100) + 20, (0 * 50) + 10, 90, 40, "Setup", modeSetup);
+	xs = 110;
+	ys = 50;
+	xoff = 20;
+	yoff = 10;
+	button[9].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (0 * ys) + yoff, 90, 40, "Run", modeRun);
+	button[10].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (1 * xs) + xoff, (0 * ys) + yoff, 90, 40, "Setup", modeSetup);
 	button[10].Press(true);
 
-	// home button
-	button[11].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (0 * 100) + 20, (1 * 50) + 10, 90, 40, "Home", setupHome);
-	
-	// calibration buttons
-	button[12].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (0 * 70) + 20, (5 * 50) + 5, 60, 40, "CW", setupCW);
-	button[13].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (1 * 70) + 20, (5 * 50) + 5, 60, 40, "CCW", setupCCW);
-	button[14].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (2 * 70) + 20, (5 * 50) + 5, 60, 40, "Set", setupSet);
+	// emergency stop button
+	button[11].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (1 * xs) + xoff, (1 * ys) + yoff, 90, 40, "EStop", estop);
 
+	// home button
+	button[12].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (1 * ys) + yoff, 90, 40, "Home", setupHome);
+	
 	// deactivate unused buttons
-	for (byte i = 15; i < numButtons; i++)
+	for (byte i = 13; i < numButtons; i++)
 		button[i].SetActive(false);
 
 	for (auto& b : button)
 		b.DrawButton();
 }
 
-
-void Touchpad::ConfigureNumpad()
-{
-	const byte xs = 70;
-	const byte ys = 50;
-	const byte xoff = 20;
-	const byte yoff = 5;
-
-	// siding buttons
-	button[0].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (2 * ys) + yoff, 60, 40, "1", numpad1);
-	button[1].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (1 * xs) + xoff, (2 * ys) + yoff, 60, 40, "2", numpad2);
-	button[2].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (2 * xs) + xoff, (2 * ys) + yoff, 60, 40, "3", numpad3);
-	button[3].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (3 * ys) + yoff, 60, 40, "4", numpad4);
-	button[4].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (1 * xs) + xoff, (3 * ys) + yoff, 60, 40, "5", numpad5);
-	button[5].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (2 * xs) + xoff, (3 * ys) + yoff, 60, 40, "6", numpad6);
-	button[6].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (4 * ys) + yoff, 60, 40, "7", numpad7);
-	button[7].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (1 * xs) + xoff, (4 * ys) + yoff, 60, 40, "8", numpad8);
-	button[8].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (2 * xs) + xoff, (4 * ys) + yoff, 60, 40, "9", numpad9);
-}
-
 bool Touchpad::IsSidingButton(byte buttonID)
 {
 	switch (buttonID)
 	{
-	case numpad0:
 	case numpad1:
 	case numpad2:
 	case numpad3:

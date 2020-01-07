@@ -90,8 +90,8 @@ void GraphicButton::DrawButton()
 	const unsigned int color = state ? onColor : offColor;
 	byte t = borderThickness;
 
-	unsigned int centerx = 0;
-	unsigned int centery = 0;
+	uint16_t centerx = 0;
+	uint16_t centery = 0;
 
 	switch (shape)
 	{
@@ -120,10 +120,11 @@ void GraphicButton::DrawButton()
 	if (showLabel)
 	{
 		// set text origin (same for all shapes once we have the center point)
-		int x1, y1;
-		unsigned int w, h;
+		int16_t x1, y1;
+		uint16_t w, h;
 		tftdisplay->setTextSize(textSize);
 		tftdisplay->getTextBounds(label, 0, 0, &x1, &y1, &w, &h);
+
 		const unsigned int textx = centerx - w / 2;
 		const unsigned int texty = centery - h / 2;   // y is top line for standard font
 

@@ -16,24 +16,6 @@
 #include <Wire.h>
 
 
-//#define numpad0 0
-//#define numpad1 1
-//#define numpad2 2
-//#define numpad3 3
-//#define numpad4 4
-//#define numpad5 5
-//#define numpad6 6
-//#define numpad7 7
-//#define numpad8 8
-//#define numpad9 9
-//#define modeRun 20
-//#define modeSetup 21
-//#define runReverse 30
-//#define setupCW 40
-//#define setupCCW 41
-//#define setupSet 42
-
-
 class Touchpad
 {
 public:
@@ -45,27 +27,11 @@ public:
 	void Update(uint32_t curMillis);
 	void SetGraphicButtonHandler(GraphicButtonHandler handler);
 
-	// button IDs
-	//const byte numpad0 = 0;
-	//const byte numpad1 = 1;
-	//const byte numpad2 = 2;
-	//const byte numpad3 = 3;
-	//const byte numpad4 = 4;
-	//const byte numpad5 = 5;
-	//const byte numpad6 = 6;
-	//const byte numpad7 = 7;
-	//const byte numpad8 = 8;
-	//const byte numpad9 = 9;
-	//const byte modeRun = 20;
-	//const byte modeSetup = 21;
-	//const byte runReverse = 30;
-	//const byte setupCW = 40;
-	//const byte setupCCW = 41;
-	//const byte setupSet = 42;
-
 	enum buttonIDs : byte
 	{
-		numpad0 = 0,
+		// these are available via dcc extended accessory command
+		runReverse = 0,
+
 		numpad1 = 1,
 		numpad2 = 2,
 		numpad3 = 3,
@@ -75,13 +41,25 @@ public:
 		numpad7 = 7,
 		numpad8 = 8,
 		numpad9 = 9,
-		modeRun = 20,
-		modeSetup = 21,
-		runReverse = 30,
-		setupCW = 40,
-		setupCCW = 41,
-		setupSet = 42,
-		setupHome = 43,
+
+		setup10CW = 21,
+		setup10CCW = 22,
+		setup30CW = 23,
+		setup30CCW = 24,
+		setup90CW = 25,
+		setup90CCW = 26,
+
+		setupStepCW = 31,
+		setupStepCCW = 32,
+
+		// these are only available via touchscreen
+		setupHome = 40,
+		setupSet = 41,
+
+		modeRun = 50,
+		modeSetup = 51,
+
+		estop = 110,
 	};
 
 
@@ -140,10 +118,9 @@ private:
 	void ConfigureTouchscreen();
 	void ConfigureRunPage();
 	void ConfigureSetupPage();
-	void ConfigureNumpad();
 
 	// button setup
-	enum : byte { numButtons = 15 };
+	enum : byte { numButtons = 13 };
 	GraphicButton button[numButtons];
 
 	// event handlers
