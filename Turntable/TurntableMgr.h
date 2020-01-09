@@ -19,14 +19,13 @@
 #include "RGB_LED.h"
 #include "AccelStepper.h"
 #include "Adafruit_MotorShield.h"
+#include "CVManager.h"
 
 #if defined(WITH_DCC)
 #include "DCCdecoder.h"
 #endif // WITH_DCC
 
-#if defined(WITH_TOUCHSCREEN)
-#include "Touchpad.h"
-#endif // WITH_TOUCHSCREEN
+#include "Touchpad.h"   // TODO: find a better way to do button/command IDs, so this doesn't need to be built if we aren't using the touchscreen
 
 #if defined (ADAFRUIT_METRO_M0_EXPRESS)
 #include "FlashStorage.h"
@@ -153,13 +152,8 @@ private:
 	Button hallSensor{ hallSensorPin, true };
 	EventTimer idleTimer;
 	EventTimer warmupTimer;
+	EventTimer errorTimer;
 	RgbLed flasher{ LEDPin };
-
-	enum : uint16_t
-	{
-		idleTimeout = 300,      // timeouts in seconds
-		warmupTimeout = 5,
-	};
 
 	struct MoveCmd
 	{
@@ -183,9 +177,6 @@ private:
 	#if defined(WITH_TOUCHSCREEN)
 	Touchpad touchpad;
 	#endif    // defined(WITH_TOUCHSCREEN)
-
-	enum : byte { pageRun, pageSetup };
-	byte currentPage = pageRun;
 
 
 	// stepper motor and related =================================================================
@@ -220,13 +211,13 @@ private:
 	DCCdecoder dcc;
 	#endif	// WITH_DCC
 
-	byte dccAddress = 50;     // the dcc address of the decoder
-
 	// define our available cv's  (allowable range 33-81 per 9.2.2)
 	enum : byte
 	{
-		CV_AddressLSB = 1,
-		CV_AddressMSB = 9,
+		CV_AddressLSB = 1,                   // low byte of address
+		CV_AddressMSB = 9,                   // high byte of address
+		CV_WarmupTimeout = 33,               // warmup timeout, in seconds
+		CV_IdleTimeout = 34,     // 16 bit   // idle timeout, in seconds
 	};
 
 	// factory reset cv's
@@ -237,22 +228,15 @@ private:
 		CV_hardResetValue = 55,
 	};
 
-	// set up cv's
-	struct CV
-	{
-		byte cvNum;           // cv number
-		uint16_t cvValue;           // current cv value
-		bool softReset;       // should this cv get reset during a soft reset
-		uint16_t cvDefault;   // default value for the cv
-	};
-
-	enum : byte { numCVs = 2, numSidings = 10 };
+	enum : byte { numCVindexes = 5, numSidingIndexes = 18 };
+	CVManager configCVs{ numCVindexes };
+	CVManager sidingCVs{ numSidingIndexes };
 
 public:       // these are public so we can use them with FlashStorage globals
 	struct ConfigVars
 	{
-		CV CVs[numCVs];
-		CV sidingSteps[numSidings];       // TODO: separate struct for these?
+		byte CVs[numCVindexes];
+		uint16_t sidingSteps[numSidingIndexes];
 	};
 
 	struct StateVars
@@ -263,35 +247,14 @@ public:       // these are public so we can use them with FlashStorage globals
 	};
 
 private:
-	ConfigVars configVars =
-	{
-		{
-			{ CV_AddressLSB, 1, false, 1 },
-			{ CV_AddressMSB, 0, false, 0 },
-		},
-		{
-			{ 0, 0, false, 0 },   // set up default sidings to match current layout
-			{ 0, 0, false, 0 },
-			{ 0, 0, false, 13968 },
-			{ 0, 0, false, 12384 },
-			{ 0, 0, false, 10816 },
-			{ 0, 0, false, 9216 },
-			{ 0, 0, false, 7600 },
-			{ 0, 0, false, 6000 },
-			{ 0, 0, false, 15600 },
-			{ 0, 0, false, 0 },
-		}
-	};
-
+	ConfigVars configVars;
 	StateVars stateVars = { IDLE, 0, false };
 
-
-	uint16_t getCV(byte cv);
-	void SaveConfig();
 	void SaveState();
+	void LoadState();
+	void SaveConfig();
 	void LoadConfig();
 	void LoadConfig(bool reset);
-	void LoadState();
 
 
 	// event handlers  ===========================================================================
@@ -304,10 +267,12 @@ private:
 	// event handler functions
 	static void StepperClockwiseStep();
 	static void StepperCounterclockwiseStep();
+	void DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value);
 
 	// wrappers for callbacks
 	static void WrapperIdleTimerHandler();
 	static void WrapperWarmupTimerHandler();
+	static void WrapperErrorTimerHandler();
 	static void WrapperGraphicButtonHandler(byte buttonID, bool state);
 
 	// DCC event handler wrappers

@@ -17,6 +17,25 @@ TurntableMgr::TurntableMgr()
 
 void TurntableMgr::Initialize()
 {
+	// configure factory default CVs
+	byte index = 0;
+	index = configCVs.initCV(index, CV_AddressLSB, 50);
+	index = configCVs.initCV(index, CV_AddressMSB, 0);
+	index = configCVs.initCV(index, CV_WarmupTimeout, 5, 0, 30);
+	configCVs.initCV16(index, CV_IdleTimeout, 300, 0, 600);
+
+	// configure default siding positions (set up to match current layout)
+	index = 0;
+	index = sidingCVs.initCV16(index, 1, 0, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 2, 13968, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 3, 12384, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 4, 10816, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 5, 9216, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 6, 7600, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 7, 6000, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 8, 15600, 0, 180U * stepsPerDegree);
+	sidingCVs.initCV16(index, 9, 10 * stepsPerDegree, 0, 180U * stepsPerDegree);
+
 	// load config and last saved state
 	LoadState();
 	LoadConfig();
@@ -27,12 +46,14 @@ void TurntableMgr::Initialize()
 	// configure callbacks
 	idleTimer.SetTimerHandler(WrapperIdleTimerHandler);
 	warmupTimer.SetTimerHandler(WrapperWarmupTimerHandler);
+	errorTimer.SetTimerHandler(WrapperErrorTimerHandler);
 
 	#if defined(WITH_DCC)
 	// Configure and initialize the DCC packet processor (accessory decoder in output address mode)
 	const byte cv29 = DCCdecoder::CV29_ACCESSORY_DECODER | DCCdecoder::CV29_OUTPUT_ADDRESS_MODE;
 	dcc.SetupDecoder(0, 0, cv29, false);
-	dcc.SetAddress(dccAddress);
+	byte addr = (configCVs.getCV(CV_AddressMSB) << 8) + configCVs.getCV(CV_AddressLSB);
+	dcc.SetAddress(addr);
 
 	// configure dcc event handlers
 	dcc.SetBasicAccessoryDecoderPacketHandler(WrapperDCCAccPacket);
@@ -49,19 +70,8 @@ void TurntableMgr::Initialize()
 	#endif // defined(WITH_TOUCHSCREEN)
 
 	// start the state machine
-	//if (currentState == MOVING || currentState == SEEK)
-	//	// we shutdown without reaching our destination, so stepper position is unknown
-	//{
-	//	currentState = SEEK;
-	//	currentStateFunction = &TurntableMgr::stateSeek;
-	//}
-	//else
-		// normal startup
-	{
-		currentState = IDLE;
-		currentStateFunction = &TurntableMgr::stateIdle;
-	}
-
+	currentState = IDLE;
+	currentStateFunction = &TurntableMgr::stateIdle;
 }
 
 
@@ -100,6 +110,8 @@ void TurntableMgr::stateIdle()
 	#if defined(WITH_TOUCHSCREEN)
 	touchpad.Update();
 	#endif // defined(WITH_TOUCHSCREEN)
+
+	errorTimer.Update();
 }
 
 
@@ -112,7 +124,7 @@ void TurntableMgr::stateMoving()
 		dcc.SuspendBitstream();
 		#endif   // WITH_DCC
 
-		flasher.SetLED(RgbLed::RED, RgbLed::FLASH);
+		flasher.SetLED(RgbLed::RED, RgbLed::FLASH, 500, 500);
 
 		// move to the specified siding at normal speed
 		accelStepper.setMaxSpeed(stepperMaxSpeed);
@@ -207,7 +219,7 @@ void TurntableMgr::stateCalibrate()
 	if (subState == 0)     // transition to state
 	{
 
-		flasher.SetLED(RgbLed::RED, RgbLed::FLASH);
+		flasher.SetLED(RgbLed::RED, RgbLed::FLASH, 500, 500);
 
 		#if defined(WITH_DCC)
 		dcc.SuspendBitstream();
@@ -262,7 +274,7 @@ void TurntableMgr::statePowered()
 		#endif // deinfed(WITH_DCC)
 
 		// start the timer for the transition to idle state
-		idleTimer.StartTimer(1000UL * idleTimeout);
+		idleTimer.StartTimer(1000UL * configCVs.getCV(CV_IdleTimeout));
 		subState = 1;
 	}
 
@@ -279,6 +291,7 @@ void TurntableMgr::statePowered()
 	uint32_t currentMillis = millis();
 	flasher.Update(currentMillis);
 	idleTimer.Update(currentMillis);
+	errorTimer.Update(currentMillis);
 }
 
 void TurntableMgr::stateWarmup()
@@ -290,10 +303,10 @@ void TurntableMgr::stateWarmup()
 		dcc.SuspendBitstream();
 		#endif   // WITH_DCC
 
-		flasher.SetLED(RgbLed::RED, RgbLed::FLASH);
+		flasher.SetLED(RgbLed::RED, RgbLed::FLASH, 500, 500);
 
 		// start the timer for the transition to moving state
-		warmupTimer.StartTimer(1000UL * warmupTimeout);
+		warmupTimer.StartTimer(1000UL * configCVs.getCV(CV_WarmupTimeout));
 		flasher.SetLED(RgbLed::RED, RgbLed::FLASH);
 		subState = 1;
 	}
@@ -343,7 +356,7 @@ void TurntableMgr::configureStepper()
 	accelStepper.setAcceleration(stepperAcceleration);
 
 	// set stepper position to correspond to current siding
-	accelStepper.setCurrentPosition(configVars.sidingSteps[currentSiding].cvValue);
+	accelStepper.setCurrentPosition(sidingCVs.getCV(currentSiding));
 }
 
 
@@ -414,6 +427,7 @@ int32_t TurntableMgr::findFullStep(int32_t microsteps)
 
 void TurntableMgr::WrapperIdleTimerHandler() { currentInstance->raiseEvent(IDLETIMER); }
 void TurntableMgr::WrapperWarmupTimerHandler() { currentInstance->raiseEvent(WARMUPTIMER); }
+void TurntableMgr::WrapperErrorTimerHandler() {	currentInstance->flasher.SetLED(RgbLed::OFF); }
 
 void TurntableMgr::WrapperGraphicButtonHandler(byte buttonID, bool state)
 {
@@ -432,6 +446,7 @@ void TurntableMgr::WrapperDCCExtPacket(int boardAddress, int outputAddress, byte
 
 void TurntableMgr::WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byte instructionType, int cv, byte data)
 {
+	currentInstance->DCCPomHandler(outputAddress, instructionType, cv, data);
 }
 
 void TurntableMgr::WrapperMaxBitErrors(byte errorCode)
@@ -447,22 +462,6 @@ void TurntableMgr::WrapperDCCDecodingError(byte errorCode)
 }
 
 
-uint16_t TurntableMgr::getCV(byte cv)
-{
-	byte i = 0;
-	while (configVars.CVs[i].cvNum != i) i++;
-	return configVars.CVs[i].cvValue;
-}
-
-void TurntableMgr::SaveConfig()
-{
-	#if defined(ADAFRUIT_METRO_M0_EXPRESS)
-	flashConfig.write(configVars);
-	#else
-	EEPROM.put(sizeof(stateVars), configVars);   // store the config vars struct starting after the state vars in EEPROM
-	#endif
-}
-
 void TurntableMgr::SaveState()
 {
 	stateVars.currentState = currentState;
@@ -476,54 +475,16 @@ void TurntableMgr::SaveState()
 	#endif
 }
 
-void TurntableMgr::LoadConfig()
-{
-	LoadConfig(false);
-}
-
-void TurntableMgr::LoadConfig(bool reset)
-{
-	#if defined(ADAFRUIT_METRO_M0_EXPRESS)
-	const bool firstBoot = !stateVars.isValid;   //  isValid should be false on first boot, but
-												 //  must load state from flash before loading config
-	#else
-	const bool firstBoot = (EEPROM.read(0) == 255);    // default value for unwritten eeprom
-	#endif
-
-	if (firstBoot || reset)   // if this is the first boot on fresh eeprom/flash, or reset requested
-	{
-
-		//load default values for config vars and sidings
-		for (byte i = 0; i < numCVs; i++)
-			configVars.CVs[i].cvValue = configVars.CVs[i].cvDefault;
-		for (byte i = 0; i < numSidings; i++)
-			configVars.sidingSteps[i].cvValue = configVars.sidingSteps[i].cvDefault;
-
-		SaveState();
-		SaveConfig();
-	}
-	else
-	{
-
-		#if defined(ADAFRUIT_METRO_M0_EXPRESS)
-		configVars = flashConfig.read();
-		#else
-		EEPROM.get(sizeof(stateVars), configVars);   // load the config vars struct starting after the state vars in EEPROM
-		#endif
-	}
-
-}
-
 void TurntableMgr::LoadState()
 {
 	#if defined(ADAFRUIT_METRO_M0_EXPRESS)
 	StateVars tempStateVars = flashState.read();
-	const bool firstBoot = !tempStateVars.isValid;
+	const bool firstBoot = !tempStateVars.isValid;  // this is false on read of unitialized flash
 	#else
 	const bool firstBoot = (EEPROM.read(0) == 255);
 	#endif
 
-	if (!firstBoot)   // if not first boot, then load stored state, otherwise use stateVars default initializations
+	if (!firstBoot)   // if not first boot, then load stored state, otherwise use default statevars initialization
 	{
 
 		#if defined(ADAFRUIT_METRO_M0_EXPRESS)
@@ -534,14 +495,67 @@ void TurntableMgr::LoadState()
 
 		currentState = stateVars.currentState;
 		currentSiding = stateVars.currentSiding;
-
-	}
-	else
-	{
-
 	}
 }
 
+void TurntableMgr::SaveConfig()
+{
+	// copy working CVs to our storage object
+	for (byte i = 0; i < numCVindexes; i++)
+		configVars.CVs[i] = configCVs.cv[i].cvValue;
+	for (byte i = 0; i < numSidingIndexes; i++)
+		configVars.sidingSteps[i] = sidingCVs.cv[i].cvValue;
+
+	// store the config
+	#if defined(ADAFRUIT_METRO_M0_EXPRESS)
+	flashConfig.write(configVars);
+	#else
+	EEPROM.put(sizeof(stateVars), configVars);   // store the config vars struct starting after the state vars in EEPROM
+	#endif
+}
+
+void TurntableMgr::LoadConfig()
+{
+	LoadConfig(false);
+}
+
+void TurntableMgr::LoadConfig(bool reset)
+{
+	//// determine reset or normal boot
+	//#if defined(ADAFRUIT_METRO_M0_EXPRESS)
+	//const bool firstBoot = !stateVars.isValid;   //  isValid should be false on first boot, but
+	//											 //  must load state from flash before loading config
+	//#else
+	//const bool firstBoot = (EEPROM.read(0) == 255);    // default value for unwritten eeprom
+	//#endif
+
+	// if this is the first boot on fresh eeprom/flash, or reset requested
+	if (!stateVars.isValid || reset)   
+	{
+
+		//load default values for config vars and sidings
+		configCVs.resetCVs();
+		sidingCVs.resetCVs();
+
+		SaveState();
+		SaveConfig();
+	}
+	else   // normal boot, load config from eeprom/flash
+	{
+
+		#if defined(ADAFRUIT_METRO_M0_EXPRESS)
+		configVars = flashConfig.read();
+		#else
+		EEPROM.get(sizeof(stateVars), configVars);   // load the config vars struct starting after the state vars in EEPROM
+		#endif
+
+		// copy stored config to working CVs
+		for (byte i = 0; i < numCVindexes; i++)
+			configCVs.cv[i].cvValue = configVars.CVs[i];
+		for (byte i = 0; i < numSidingIndexes; i++)
+			sidingCVs.cv[i].cvValue = configVars.sidingSteps[i];
+	}
+}
 
 void TurntableMgr::SetSidingCal()
 {
@@ -549,7 +563,7 @@ void TurntableMgr::SetSidingCal()
 	long pos = accelStepper.currentPosition();
 	uint16_t basicPos = findBasicPosition(pos);
 	int32_t fullstepPos = findFullStep(basicPos);
-	configVars.sidingSteps[currentSiding].cvValue = fullstepPos;
+	sidingCVs.setCV(currentSiding, fullstepPos);
 
 	// store the turntable state and cv struct to nvram
 	SaveConfig();
@@ -566,7 +580,7 @@ void TurntableMgr::HallIrq()
 void TurntableMgr::CommandHandler(byte buttonID, bool state)
 {
 
-	if (state)        // button was pressed
+	if (state)        // button was pressed or dcc command received
 	{
 		switch (buttonID)
 		{
@@ -580,19 +594,15 @@ void TurntableMgr::CommandHandler(byte buttonID, bool state)
 		case Touchpad::numpad8:
 		case Touchpad::numpad9:
 			currentSiding = buttonID;
-			moveCmd.targetPos = configVars.sidingSteps[currentSiding].cvValue;
+			moveCmd.targetPos = sidingCVs.getCV(currentSiding);
 			raiseEvent(BUTTON_SIDING);
 			break;
 		case Touchpad::modeRun:
-			currentPage = pageRun;
 			break;
 		case Touchpad::modeSetup:
-			currentPage = pageSetup;
 			break;
 		case Touchpad::runReverse:
 			moveCmd.type = MoveCmd::reverse;  // this gets reset after the reverse move is complete
-			//moveCmd.targetPos = configVars.sidingSteps[currentSiding].cvValue;
-			//raiseEvent(BUTTON_SIDING);
 			break;
 
 		// calibration commands
@@ -651,7 +661,7 @@ void TurntableMgr::CommandHandler(byte buttonID, bool state)
 			break;
 		}
 	}
-	else             // button was released
+	else             // button was released (n/a for dcc commands)
 	{
 		switch (buttonID)
 		{
@@ -673,4 +683,33 @@ void TurntableMgr::StepperClockwiseStep()
 void TurntableMgr::StepperCounterclockwiseStep()
 {
 	currentInstance->afStepper->onestep(BACKWARD, MICROSTEP);
+}
+
+void TurntableMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value)
+{
+	// assume we are filtering repeated packets in the packet builder, so we don't check for that here
+	// assume DCCdecoder is set to return only packets for this decoder's address.
+
+	// TODO: check for and perform reset
+
+	// set the cv
+	if (configCVs.setCV(CV,Value))
+	{
+		errorTimer.StartTimer(250);
+		flasher.SetLED(RgbLed::RED, RgbLed::FLASH, 50, 50);
+	}
+	else
+	{
+		errorTimer.StartTimer(1000);
+		flasher.SetLED(RgbLed::RED, RgbLed::FLASH, 250, 250);
+	}
+
+	#if defined(WITH_DCC)
+	// update dcc address
+	byte addr = (configCVs.getCV(CV_AddressMSB) << 8) + configCVs.getCV(CV_AddressLSB);
+	dcc.SetAddress(addr);
+	#endif
+
+	// save the new config
+	SaveConfig();
 }
