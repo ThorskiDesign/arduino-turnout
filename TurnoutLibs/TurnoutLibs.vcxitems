@@ -20,6 +20,7 @@
   <ItemGroup>
     <!-- <ClInclude Include="$(MSBuildThisFileDirectory)TurnoutLibs.h" /> -->
     <ClCompile Include="$(MSBuildThisFileDirectory)src\Button.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)src\CVManager.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)src\EventTimer.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)src\HardwareDebug.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)src\OutputPin.cpp" />
@@ -29,6 +30,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(MSBuildThisFileDirectory)src\Button.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)src\CVManager.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)src\EventTimer.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)src\HardwareDebug.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)src\OutputPin.h" />
