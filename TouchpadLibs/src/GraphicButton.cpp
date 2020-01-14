@@ -48,6 +48,7 @@ bool GraphicButton::Contains(const unsigned int x, const unsigned int y)
 
 void GraphicButton::Press(bool State)
 {
+	if (state == State) return;
 	state = State;
 	DrawButton();
 }

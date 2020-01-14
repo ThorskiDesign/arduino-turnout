@@ -21,7 +21,7 @@ void Touchpad::SetGraphicButtonHandler(GraphicButtonHandler handler)
 void Touchpad::Update()
 {
 	currentMillis = millis();
-	
+
 	// perform the current state function
 	if (currentStateFunction)
 		(*this.*currentStateFunction)();
@@ -43,8 +43,11 @@ void Touchpad::transitionToIdle()
 		if (b.Type() == GraphicButton::MOMENTARY && b.IsPressed())
 		{
 			ButtonRelease(&b);
+			if (graphicButtonHandler) graphicButtonHandler(b.ButtonID(), false);
 		}
 	}
+
+	lastTouchTime = currentMillis;
 
 	currentState = IDLE;
 	currentStateFunction = &Touchpad::runIdle;
@@ -59,6 +62,10 @@ void Touchpad::runIdle()
 	// check for touchscreen touch
 	if (touchscreen.touched() && (currentMillis - lastDebounceTime > debounceTouch))
 		transitionToTouched();
+
+	// check for sleep
+	if (currentMillis - lastTouchTime > sleepTimeout)
+		transitionToSleep();
 }
 
 void Touchpad::transitionToTouched()
@@ -84,13 +91,12 @@ void Touchpad::transitionToTouched()
 			if (b.Type() == GraphicButton::MOMENTARY)
 			{
 				ButtonPress(&b);
+				if (graphicButtonHandler) graphicButtonHandler(b.ButtonID(), true);
 			}
-			if (b.Type() == GraphicButton::LATCHING)
+			if (b.Type() == GraphicButton::LATCHING && !b.IsPressed())
 			{
-				if (!b.IsPressed())
-					ButtonPress(&b);
-				//else
-				//	ButtonRelease(&b);
+				ButtonPress(&b);
+				if (graphicButtonHandler) graphicButtonHandler(b.ButtonID(), true);
 			}
 		}
 	}
@@ -108,6 +114,37 @@ void Touchpad::runTouched()
 	// check for touchscreen release
 	if (!touchscreen.touched() && (currentMillis - lastDebounceTime > debounceRelease))
 		transitionToIdle();
+}
+
+void Touchpad::transitionToSleep()
+{
+	// turn off the display backlight
+	digitalWrite(backlightPin, LOW);
+
+	currentState = SLEEP;
+	currentStateFunction = &Touchpad::runSleep;
+	subState = 0;
+}
+
+void Touchpad::runSleep()
+{
+	// wait for a touch/release cycle, then transition to idle
+	switch (subState)
+	{
+	case 0:   // waiting for touch
+		if (!touchscreen.touched()) lastDebounceTime = currentMillis;
+		if (touchscreen.touched() && (currentMillis - lastDebounceTime > debounceTouch))
+			subState = 1;
+		break;
+	case 1:   // waiting for release
+		if (touchscreen.touched()) lastDebounceTime = currentMillis;
+		if (!touchscreen.touched() && (currentMillis - lastDebounceTime > debounceRelease))
+		{
+			digitalWrite(backlightPin, HIGH);
+			transitionToIdle();
+		}
+		break;
+	}
 }
 
 
@@ -214,7 +251,7 @@ void Touchpad::ConfigureSetupPage()
 
 	// home button
 	button[12].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (1 * ys) + yoff, 90, 40, "Home", setupHome);
-	
+
 	// deactivate unused buttons
 	for (byte i = 13; i < numButtons; i++)
 		button[i].SetActive(false);
@@ -242,6 +279,22 @@ bool Touchpad::IsSidingButton(byte buttonID)
 	}
 }
 
+void Touchpad::SetButtonPress(byte buttonID, bool isPressed)
+{
+	// find the button matching the requested ID
+	byte i = 0;
+	while ((i < numButtons) && (button[i].ButtonID() != buttonID)) i++;
+
+	// if there is no match just return
+	if (i == numButtons) return;
+
+	// set the button
+	if (isPressed)
+		ButtonPress(&button[i]);
+	else
+		ButtonRelease(&button[i]);
+}
+
 void Touchpad::ButtonPress(GraphicButton* btn)
 {
 	// if this is a mode button, switch pages
@@ -256,16 +309,10 @@ void Touchpad::ButtonPress(GraphicButton* btn)
 
 	// set new button state
 	btn->Press(true);
-
-	// perform callback
-	if (graphicButtonHandler) graphicButtonHandler(btn->ButtonID(), true);
 }
 
 void Touchpad::ButtonRelease(GraphicButton* b)
 {
 	// set new button state
 	b->Press(false);
-
-	// perform callback
-	if (graphicButtonHandler) graphicButtonHandler(b->ButtonID(), false);
 }

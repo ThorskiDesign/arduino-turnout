@@ -66,7 +66,7 @@ private:
 	byte textSize = 2;
 	String label;
 	byte btnID = 0;
-	unsigned int xmin, xmax, ymin, ymax;    //  bounding box limits in screen coordinates
+	unsigned int xmin = 0, xmax = 0, ymin = 0, ymax = 0;    //  bounding box limits in screen coordinates
 
 	bool showLabel = true;
 	bool active = true;          // should the button be displayed and touchable

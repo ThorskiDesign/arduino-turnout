@@ -26,6 +26,7 @@ public:
 	void Update();
 	void Update(uint32_t curMillis);
 	void SetGraphicButtonHandler(GraphicButtonHandler handler);
+	void SetButtonPress(byte buttonID, bool isPressed);
 
 	enum buttonIDs : byte
 	{
@@ -84,6 +85,7 @@ private:
 	{
 		IDLE,           // touchscreen is untouched, no touch to handle, but should still update display
 		TOUCHED,        // touchscreen is touched
+		SLEEP,          // touchscreen backlight is off
 	};
 
 	touchpadState currentState = IDLE;
@@ -98,6 +100,8 @@ private:
 	void runIdle();
 	void transitionToTouched();
 	void runTouched();
+	void transitionToSleep();
+	void runSleep();
 
 
 	// tft display and touchscreen setup   ========================================================
@@ -110,9 +114,16 @@ private:
 	uint16_t touchx = 0;
 	uint16_t touchy = 0;
 
-	uint16_t debounceTouch = 50;   // ms, to eliminate spurious touch/release cycles
-	uint16_t debounceRelease = 100;
+	enum : byte
+	{
+		debounceTouch = 50,       // ms, to eliminate spurious touch/release cycles
+		debounceRelease = 100,
+	};
+
+	enum : uint32_t { sleepTimeout = 5 * 60 * 1000 };
+
 	uint32_t lastDebounceTime = 0;
+	uint32_t lastTouchTime = 0;
 	uint32_t currentMillis = 0;
 
 	void ConfigureTouchscreen();
