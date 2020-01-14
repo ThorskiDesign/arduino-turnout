@@ -111,6 +111,11 @@ boolean DCCdecoder::SetCV(int cv, byte newValue)
 // get the address of this decoder
 int DCCdecoder::Address()
 {
+	#if defined(ADAFRUIT_METRO_M0_EXPRESS)
+	// TODO: this is a hack for Turntable/ARM, fix this
+	return baseAddress;
+	#endif
+
     int address;
 
 	const byte cv29 = GetCV(kCV_ConfigurationData1);
@@ -132,6 +137,14 @@ int DCCdecoder::Address()
     }
 
     return address;
+}
+
+
+bool DCCdecoder::SetAddress(uint16_t address)
+{
+	// TODO: check for valid address range
+	baseAddress = address;
+	return true;
 }
 
 
@@ -256,7 +269,7 @@ void DCCdecoder::ProcessPacket(byte *packetData, byte size)
         ProcessBroadcastPacket();
         break;
     case LOCO_SHORT:
-        ProcessShortLocoPacket();
+        //ProcessShortLocoPacket();
         break;
     case LOCO_LONG:
         ProcessLongLocoPacket();
@@ -301,47 +314,47 @@ void DCCdecoder::ProcessBroadcastPacket()
 }
 
 
-// Process a loco packet with a short address
-void DCCdecoder::ProcessShortLocoPacket()
-{
-    // bits as defined in 9.2
-    byte addressByte =  packet[0] & 0x7F;
-    byte directionBit = packet[1] & 0x20;
-    byte cBit =         packet[1] & 0x10;
-    byte speedBits =    packet[1] & 0x0F;
-
-    // Stop or estop??
-    if( speedBits==0 )
-    {
-        speedBits = kDCC_STOP_SPEED;    
-    }
-    else
-    {
-        if( speedBits== 1 )
-        {
-            speedBits = kDCC_ESTOP_SPEED;
-        }
-        else
-        {            
-            if( GetCV(kCV_ConfigurationData1) & 0x02 )  // Bit 1 of CV29: 0=14speeds, 1=28Speeds
-            {
-                speedBits = ((speedBits << 1 ) & (cBit ? 1 : 0)) - 3;   // speedBits = 1..28
-            }
-            else
-            {
-                speedBits -= 1;                                         // speedBits = 1..14
-            }
-        }
-    }
-
-    // do callback
-    boolean isPacketForThisAddress = (addressByte == GetCV(kCV_PrimaryAddress));
-    if (isPacketForThisAddress || returnAllPackets)
-    {
-        if(basicControlHandler)
-            basicControlHandler(addressByte,speedBits,directionBit);
-    }
-}
+//// Process a loco packet with a short address
+//void DCCdecoder::ProcessShortLocoPacket()
+//{
+//    // bits as defined in 9.2
+//    byte addressByte =  packet[0] & 0x7F;
+//    byte directionBit = packet[1] & 0x20;
+//    byte cBit =         packet[1] & 0x10;
+//    byte speedBits =    packet[1] & 0x0F;
+//
+//    // Stop or estop??
+//    if( speedBits==0 )
+//    {
+//        speedBits = kDCC_STOP_SPEED;    
+//    }
+//    else
+//    {
+//        if( speedBits== 1 )
+//        {
+//            speedBits = kDCC_ESTOP_SPEED;
+//        }
+//        else
+//        {            
+//            if( GetCV(kCV_ConfigurationData1) & 0x02 )  // Bit 1 of CV29: 0=14speeds, 1=28Speeds
+//            {
+//                speedBits = ((speedBits << 1 ) & (cBit ? 1 : 0)) - 3;   // speedBits = 1..28
+//            }
+//            else
+//            {
+//                speedBits -= 1;                                         // speedBits = 1..14
+//            }
+//        }
+//    }
+//
+//    // do callback
+//    boolean isPacketForThisAddress = (addressByte == GetCV(kCV_PrimaryAddress));
+//    if (isPacketForThisAddress || returnAllPackets)
+//    {
+//        if(basicControlHandler)
+//            basicControlHandler(addressByte,speedBits,directionBit);
+//    }
+//}
 
 
 // Process a loco packet with a long address

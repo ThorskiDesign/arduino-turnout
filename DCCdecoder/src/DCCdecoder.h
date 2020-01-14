@@ -150,6 +150,7 @@ public:
 
 	// Helper function to read decoder address
 	int Address();
+	bool SetAddress(uint16_t address);
 
 private:
 
@@ -247,6 +248,8 @@ private:
 
 	enum : byte { numAccPacketTypes = sizeof(accPacketSpec) / sizeof(AccPacketSpec) };
 
+	uint16_t baseAddress = 1;    // address of the decoder
+
 	// DCC bitstream and packet processors
 	BitStream bitStream;
 	DCCpacket dccPacket{ true, true, 250 };
@@ -275,7 +278,7 @@ private:
 	// Packet processors
 	void ProcessIdlePacket();
 	void ProcessBroadcastPacket();
-	void ProcessShortLocoPacket();
+	//void ProcessShortLocoPacket();
 	void ProcessLongLocoPacket();
 	void ProcessAccBroadcastPacket();
 	void ProcessAccPacket();
