@@ -22,18 +22,18 @@ void TurntableMgr::Initialize()
 	index = configCVs.initCV(index, CV_AddressLSB, 50);
 	index = configCVs.initCV(index, CV_AddressMSB, 0);
 	index = configCVs.initCV(index, CV_WarmupTimeout, 5, 0, 30);
-	configCVs.initCV16(index, CV_IdleTimeout, 300, 0, 600);
+	configCVs.initCV16(index, CV_IdleTimeout, 600, 0, 1200);
 
 	// configure default siding positions (set up to match current layout)
 	index = 0;
-	index = sidingCVs.initCV16(index, 1, 0, 0, 180U * stepsPerDegree);
-	index = sidingCVs.initCV16(index, 2, 13968, 0, 180U * stepsPerDegree);
-	index = sidingCVs.initCV16(index, 3, 12384, 0, 180U * stepsPerDegree);
-	index = sidingCVs.initCV16(index, 4, 10816, 0, 180U * stepsPerDegree);
-	index = sidingCVs.initCV16(index, 5, 9216, 0, 180U * stepsPerDegree);
-	index = sidingCVs.initCV16(index, 6, 7600, 0, 180U * stepsPerDegree);
-	index = sidingCVs.initCV16(index, 7, 6000, 0, 180U * stepsPerDegree);
-	index = sidingCVs.initCV16(index, 8, 15600, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 1, 21472, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 2, 6640, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 3, 5056, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 4, 3488, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 5, 1888, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 6, 256, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 7, 27472, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 8, 8288, 0, 180U * stepsPerDegree);
 	sidingCVs.initCV16(index, 9, 10 * stepsPerDegree, 0, 180U * stepsPerDegree);
 
 	// load config and last saved state
@@ -41,7 +41,7 @@ void TurntableMgr::Initialize()
 	LoadConfig();
 
 	// setup the stepper
-	configureStepper();
+	ConfigureStepper();
 
 	// configure callbacks
 	idleTimer.SetTimerHandler(WrapperIdleTimerHandler);
@@ -71,7 +71,7 @@ void TurntableMgr::Initialize()
 
 	// start the state machine
 	currentState = IDLE;
-	currentStateFunction = &TurntableMgr::stateIdle;
+	currentStateFunction = &TurntableMgr::StateIdle;
 }
 
 
@@ -85,7 +85,7 @@ void TurntableMgr::Update()
 
 //  state transition functions  ===================================================================
 
-void TurntableMgr::stateIdle()
+void TurntableMgr::StateIdle()
 {
 	if (subState == 0)     // transition to state
 	{
@@ -115,7 +115,7 @@ void TurntableMgr::stateIdle()
 }
 
 
-void TurntableMgr::stateMoving()
+void TurntableMgr::StateMoving()
 {
 	if (subState == 0)     // transition to state
 	{
@@ -129,7 +129,7 @@ void TurntableMgr::stateMoving()
 		// move to the specified siding at normal speed
 		accelStepper.setMaxSpeed(stepperMaxSpeed);
 		accelStepper.setAcceleration(stepperAcceleration);
-		moveToSiding();
+		MoveToSiding();
 
 		subState = 1;
 	}
@@ -147,11 +147,11 @@ void TurntableMgr::stateMoving()
 	{
 		SaveState();    // TODO: add checks here to minimize flash/eeprom writes
 						// TODO: need to save current siding, but this is the wrong place to save state
-		raiseEvent(MOVE_DONE);
+		RaiseEvent(MOVE_DONE);
 	}
 }
 
-void TurntableMgr::stateSeek()
+void TurntableMgr::StateSeek()
 {
 	hallSensor.Update();
 
@@ -204,17 +204,17 @@ void TurntableMgr::stateSeek()
 
 	// When we stop after substate 5, or if we miss a hall sensor event and go full circle, end the move
 	if (accelStepper.distanceToGo() == 0)
-		raiseEvent(MOVE_DONE);      // motion has stopped, raise event to exit seek state
+		RaiseEvent(MOVE_DONE);      // motion has stopped, raise event to exit seek state
 
 	// do the update functions for this state
-	//hallSensor.Update();
+	hallSensor.Update();
 	accelStepper.run();
 	//hallSensor.Update();
 	//flasher.Update();
 }
 
 
-void TurntableMgr::stateCalibrate()
+void TurntableMgr::StateCalibrate()
 {
 	if (subState == 0)     // transition to state
 	{
@@ -246,7 +246,7 @@ void TurntableMgr::stateCalibrate()
 		switch (calCmd.type)
 		{
 		case CalCmd::none:
-			raiseEvent(MOVE_DONE);
+			RaiseEvent(MOVE_DONE);
 			break;
 		case CalCmd::continuous:
 			accelStepper.move(calCmd.calSteps);
@@ -262,7 +262,7 @@ void TurntableMgr::stateCalibrate()
 }
 
 
-void TurntableMgr::statePowered()
+void TurntableMgr::StatePowered()
 {
 	if (subState == 0)     // transition to state
 	{
@@ -294,7 +294,7 @@ void TurntableMgr::statePowered()
 	errorTimer.Update(currentMillis);
 }
 
-void TurntableMgr::stateWarmup()
+void TurntableMgr::StateWarmup()
 {
 	if (subState == 0)     // transition to state
 	{
@@ -318,7 +318,7 @@ void TurntableMgr::stateWarmup()
 }
 
 
-void TurntableMgr::raiseEvent(const ttEvent event)
+void TurntableMgr::RaiseEvent(const ttEvent event)
 {
 	byte i = 0;
 	const byte n = sizeof(stateTransMatrix) / sizeof(stateTransMatrixRow);
@@ -339,7 +339,7 @@ void TurntableMgr::raiseEvent(const ttEvent event)
 
 //  local functions   ===========================================================================
 
-void TurntableMgr::configureStepper()
+void TurntableMgr::ConfigureStepper()
 {
 	// motorshield and stepper objects
 	motorShield = Adafruit_MotorShield();
@@ -360,13 +360,13 @@ void TurntableMgr::configureStepper()
 }
 
 
-void TurntableMgr::moveToSiding()
+void TurntableMgr::MoveToSiding()
 {
 	// get stepper position for desired siding
 	const int32_t targetPos = moveCmd.targetPos;  // put into int32 for later calcs
 
 	// get current stepper position in positive half circle equivalent
-	const uint16_t currentPos = findBasicPosition(accelStepper.currentPosition());
+	const uint16_t currentPos = FindBasicPosition(accelStepper.currentPosition());
 
 	// steps needed for move (go in opposite direction if ouside +/-90 deg)
 	int32_t moveSteps = targetPos - currentPos;
@@ -392,7 +392,7 @@ void TurntableMgr::moveToSiding()
 
 
 // convert stepper motor position to a positive position in the first half circle of rotation
-uint16_t TurntableMgr::findBasicPosition(int32_t pos)
+uint16_t TurntableMgr::FindBasicPosition(int32_t pos)
 {
 	int32_t p = pos;
 	const uint16_t halfCircleSteps = 180 * stepsPerDegree;
@@ -407,7 +407,7 @@ uint16_t TurntableMgr::findBasicPosition(int32_t pos)
 }
 
 // return the nearest full step to the current position, in microsteps
-int32_t TurntableMgr::findFullStep(int32_t microsteps)
+int32_t TurntableMgr::FindFullStep(int32_t microsteps)
 {
 	byte remainder = microsteps % stepperMicroSteps;
 
@@ -425,8 +425,8 @@ int32_t TurntableMgr::findFullStep(int32_t microsteps)
 
 // event handlers and static wrappers
 
-void TurntableMgr::WrapperIdleTimerHandler() { currentInstance->raiseEvent(IDLETIMER); }
-void TurntableMgr::WrapperWarmupTimerHandler() { currentInstance->raiseEvent(WARMUPTIMER); }
+void TurntableMgr::WrapperIdleTimerHandler() { currentInstance->RaiseEvent(IDLETIMER); }
+void TurntableMgr::WrapperWarmupTimerHandler() { currentInstance->RaiseEvent(WARMUPTIMER); }
 void TurntableMgr::WrapperErrorTimerHandler() {	currentInstance->flasher.SetLED(RgbLed::OFF); }
 
 void TurntableMgr::WrapperGraphicButtonHandler(byte buttonID, bool state)
@@ -561,8 +561,8 @@ void TurntableMgr::SetSidingCal()
 {
 	// update the siding position in our cv struct
 	long pos = accelStepper.currentPosition();
-	uint16_t basicPos = findBasicPosition(pos);
-	int32_t fullstepPos = findFullStep(basicPos);
+	uint16_t basicPos = FindBasicPosition(pos);
+	int32_t fullstepPos = FindFullStep(basicPos);
 	sidingCVs.setCV(currentSiding, fullstepPos);
 
 	// store the turntable state and cv struct to nvram
@@ -572,7 +572,7 @@ void TurntableMgr::SetSidingCal()
 
 void TurntableMgr::HallIrq()
 {
-	currentInstance->homePosition = findFullStep(currentInstance->accelStepper.currentPosition());
+	currentInstance->homePosition = FindFullStep(currentInstance->accelStepper.currentPosition());
 	currentInstance->subState = 3;   //  for seek state 3 to begin slowing down
 }
 
@@ -595,9 +595,17 @@ void TurntableMgr::CommandHandler(byte buttonID, bool state)
 		case Touchpad::numpad9:
 			currentSiding = buttonID;
 			moveCmd.targetPos = sidingCVs.getCV(currentSiding);
-			raiseEvent(BUTTON_SIDING);
+
+			#if defined(WITH_TOUCHSCREEN)
+			touchpad.SetButtonPress(currentSiding, true);
+			#endif
+
+			RaiseEvent(BUTTON_SIDING);
 			break;
 		case Touchpad::modeRun:
+			#if defined(WITH_TOUCHSCREEN)
+			touchpad.SetButtonPress(currentSiding, true);
+			#endif
 			break;
 		case Touchpad::modeSetup:
 			break;
@@ -609,42 +617,42 @@ void TurntableMgr::CommandHandler(byte buttonID, bool state)
 		case Touchpad::setupStepCW:
 			calCmd.type = CalCmd::continuous;
 			calCmd.calSteps = stepperMicroSteps;
-			raiseEvent(BUTTON_CAL);
+			RaiseEvent(BUTTON_CAL);
 			break;
 		case Touchpad::setupStepCCW:
 			calCmd.type = CalCmd::continuous;
 			calCmd.calSteps = -1L * stepperMicroSteps;
-			raiseEvent(BUTTON_CAL);
+			RaiseEvent(BUTTON_CAL);
 			break;
 		case Touchpad::setup10CW:
 			calCmd.type = CalCmd::incremental;
 			calCmd.calSteps = 10 * stepsPerDegree;
-			raiseEvent(BUTTON_CAL);
+			RaiseEvent(BUTTON_CAL);
 			break;
 		case Touchpad::setup10CCW:
 			calCmd.type = CalCmd::incremental;
 			calCmd.calSteps = -10L * stepsPerDegree;
-			raiseEvent(BUTTON_CAL);
+			RaiseEvent(BUTTON_CAL);
 			break;
 		case Touchpad::setup30CW:
 			calCmd.type = CalCmd::incremental;
 			calCmd.calSteps = 30 * stepsPerDegree;
-			raiseEvent(BUTTON_CAL);
+			RaiseEvent(BUTTON_CAL);
 			break;
 		case Touchpad::setup30CCW:
 			calCmd.type = CalCmd::incremental;
 			calCmd.calSteps = -30L * stepsPerDegree;
-			raiseEvent(BUTTON_CAL);
+			RaiseEvent(BUTTON_CAL);
 			break;
 		case Touchpad::setup90CW:
 			calCmd.type = CalCmd::incremental;
 			calCmd.calSteps = 90 * stepsPerDegree;
-			raiseEvent(BUTTON_CAL);
+			RaiseEvent(BUTTON_CAL);
 			break;
 		case Touchpad::setup90CCW:
 			calCmd.type = CalCmd::incremental;
 			calCmd.calSteps = -90L * stepsPerDegree;
-			raiseEvent(BUTTON_CAL);
+			RaiseEvent(BUTTON_CAL);
 			break;
 
 
@@ -652,10 +660,10 @@ void TurntableMgr::CommandHandler(byte buttonID, bool state)
 			SetSidingCal();
 			break;
 		case Touchpad::setupHome:
-			raiseEvent(BUTTON_SEEK);
+			RaiseEvent(BUTTON_SEEK);
 			break;
 		case Touchpad::estop:
-			raiseEvent(BUTTON_ESTOP);
+			RaiseEvent(BUTTON_ESTOP);
 			break;
 		default:
 			break;

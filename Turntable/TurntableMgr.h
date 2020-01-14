@@ -82,23 +82,23 @@ private:
 	//  keep this array in the same size/order as the ttState enum
 	StateFunctionPointer ttStateFunctions[6] =
 	{
-		&TurntableMgr::stateIdle,
-		&TurntableMgr::statePowered,
-		&TurntableMgr::stateWarmup,
-		&TurntableMgr::stateMoving,
-		&TurntableMgr::stateSeek,
-		&TurntableMgr::stateCalibrate,
+		&TurntableMgr::StateIdle,
+		&TurntableMgr::StatePowered,
+		&TurntableMgr::StateWarmup,
+		&TurntableMgr::StateMoving,
+		&TurntableMgr::StateSeek,
+		&TurntableMgr::StateCalibrate,
 	};
 
 	StateFunctionPointer currentStateFunction = 0;
 
 	// the state transition functions
-	void stateIdle();
-	void statePowered();
-	void stateWarmup();
-	void stateMoving();
-	void stateSeek();
-	void stateCalibrate();
+	void StateIdle();
+	void StatePowered();
+	void StateWarmup();
+	void StateMoving();
+	void StateSeek();
+	void StateCalibrate();
 
 	// the state transition events
 	enum ttEvent : byte
@@ -112,7 +112,7 @@ private:
 		BUTTON_ESTOP,
 	};
 
-	void raiseEvent(ttEvent event);
+	void RaiseEvent(ttEvent event);
 
 	// state transition mapping
 	struct stateTransMatrixRow
@@ -197,12 +197,12 @@ private:
 	Adafruit_StepperMotor* afStepper;
 	AccelStepper accelStepper;
 
-	void configureStepper();
-	void moveToSiding();
+	void ConfigureStepper();
+	void MoveToSiding();
 	void SetSidingCal();
 	void CommandHandler(byte buttonID, bool state);
-	static uint16_t findBasicPosition(int32_t pos);
-	static int32_t findFullStep(int32_t microsteps);
+	static uint16_t FindBasicPosition(int32_t pos);
+	static int32_t FindFullStep(int32_t microsteps);
 
 
 	// DCC  ======================================================================================
