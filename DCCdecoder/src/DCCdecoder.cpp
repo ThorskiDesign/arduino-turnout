@@ -31,8 +31,8 @@ DCCdecoder::DCCdecoder()
 	currentInstance = this;
 	
     // packet vars
-    for (byte i=0; i<kPACKET_LEN_MAX; i++)
-        packet[i] = 0;
+	for (byte i = 0; i < PACKET_LEN_MAX; i++)
+		packet[i] = 0;
 
 	// set callbacks for the bitstream capture
 	bitStream.SetDataFullHandler(WrapperBitStream);
@@ -43,107 +43,20 @@ DCCdecoder::DCCdecoder()
 	dccPacket.SetPacketErrorHandler(WrapperDCCPacketError);
 }
 
-
-DCCdecoder::DCCdecoder(byte mfgID, byte mfgVers, byte cv29, boolean allPackets) : DCCdecoder()
+DCCdecoder::DCCdecoder(DecoderSettings settings) : DCCdecoder()
 {
-    SetupDecoder(mfgID, mfgVers, cv29, allPackets);
+	decoderSettings = settings;
 }
-
-
-// Set up or reconfigure the decoder
-void DCCdecoder::SetupDecoder(byte mfgID, byte mfgVers, byte cv29, boolean allPackets)  
-{
-	// Save mfg info
-    SetCV(kCV_ManufacturerVersionNo, mfgID);
-    SetCV(kCV_ManufacturedID, mfgVers);
-
-    // store CV29 settings
-    SetCV(kCV_ConfigurationData1, cv29);
-
-    // return all packets, not just those for the decoder's address?
-    returnAllPackets = allPackets;
-}
-
-
-// CV Support  =======================================================================
-
-// read a CV
-byte DCCdecoder::GetCV(int cv)
-{
-	#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
-    if(cv >= kCV_PrimaryAddress && cv < kCV_MAX) return EEPROM.read(cv);
-	#endif
-	
-    return 0;        
-}
-
-
-// check if a CV is valid for writing
-boolean DCCdecoder::CVIsValidForWrite(int cv)
-{
-    return (cv >= kCV_PrimaryAddress && cv < kCV_MAX && cv != kCV_ManufacturerVersionNo && cv != kCV_ManufacturedID);
-}
-
-
-// write a CV (return true and perform callback if updated)
-boolean DCCdecoder::SetCV(int cv, byte newValue)
-{
-    // if cv is not valid, just return
-    if (!CVIsValidForWrite(cv)) return false;
-
-	#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
-    // is the value we're writing different from what is stored?
-	const byte currentValue = EEPROM.read(cv);
-    if (newValue != currentValue)
-    {
-        EEPROM.update(cv, newValue);
-        if (cvUpdateHandler)    // callback if we are writing a new value
-            cvUpdateHandler(cv, currentValue, newValue);
-        return true;
-    }
-	#endif
-
-    // return false if we didn't update anything
-    return false;
-}
-
-
-// get the address of this decoder
-int DCCdecoder::Address()
-{
-	#if defined(ADAFRUIT_METRO_M0_EXPRESS)
-	// TODO: this is a hack for Turntable/ARM, fix this
-	return baseAddress;
-	#endif
-
-    int address;
-
-	const byte cv29 = GetCV(kCV_ConfigurationData1);
-
-    if( cv29 & CV29_ACCESSORY_DECODER )   // Is this an accessory decoder?
-    {
-        address = GetCV(kCV_AddressMSB)<<6 | GetCV(kCV_AddressLSB);        
-    }
-    else
-    {
-        if( cv29 & CV29_EXT_ADDRESSING )   // Multifunction using extended addresses?
-        {
-            address = GetCV(kCV_ExtendedAddress1)<<8 | GetCV(kCV_ExtendedAddress2);        
-        }
-        else
-        {
-            address = GetCV(kCV_PrimaryAddress);
-        }
-    }
-
-    return address;
-}
-
 
 bool DCCdecoder::SetAddress(uint16_t address)
 {
-	// TODO: check for valid address range
-	baseAddress = address;
+	decoderSettings.baseAddress = address;
+	return true;
+}
+
+bool DCCdecoder::UpdateSettings(DecoderSettings settings)
+{
+	decoderSettings = settings;
 	return true;
 }
 
@@ -164,8 +77,6 @@ void DCCdecoder::SetBitstreamMaxErrorHandler(BitstreamErrorHandler handler) { bi
 void DCCdecoder::SetPacketErrorHandler(PacketErrorHandler handler) { packetErrorHandler = handler; }
 void DCCdecoder::SetPacketMaxErrorHandler(PacketErrorHandler handler) { packetMaxErrorHandler = handler; }
 void DCCdecoder::SetDecodingErrorHandler(DecodingErrorHandler handler) { decodingErrorHandler = handler; }
-
-void DCCdecoder::SetCVUpdateHandler(CVUpdateHandler handler) { cvUpdateHandler = handler; }
 
 
 // Bitstream control  ==========================================================================
@@ -239,12 +150,12 @@ void DCCdecoder::ProcessPacket(byte *packetData, byte size)
     byte i = 0;
     bool packetIdentified = false;
 
-    while (!packetIdentified && i < numPacketTypes )
-    {
-        if ((packet[0] & packetSpec[i].specMask) == packetSpec[i].specAns)
-            packetIdentified = true;
-        i++;
-    }
+	while (i < numPacketTypes && !packetIdentified)
+	{
+		if ((packet[0] & packetSpec[i].specMask) == packetSpec[i].specAns)
+			packetIdentified = true;
+		i++;
+	}
 
     // assign the packet type we identified
     if (packetIdentified)
@@ -253,9 +164,8 @@ void DCCdecoder::ProcessPacket(byte *packetData, byte size)
     }
     else    // exit with error if we can't identify the packet
     {
-        packetType = UNKNOWNPKT;
         if (decodingErrorHandler)
-            decodingErrorHandler(kDCC_ERR_UNKNOWN_PACKET);
+            decodingErrorHandler(DCC_ERR_UNKNOWN_PACKET);
         return;
     }
 
@@ -272,7 +182,7 @@ void DCCdecoder::ProcessPacket(byte *packetData, byte size)
         //ProcessShortLocoPacket();
         break;
     case LOCO_LONG:
-        ProcessLongLocoPacket();
+        //ProcessLongLocoPacket();
         break;
     case ACCBROADCAST:
         ProcessAccBroadcastPacket();
@@ -314,54 +224,12 @@ void DCCdecoder::ProcessBroadcastPacket()
 }
 
 
-//// Process a loco packet with a short address
-//void DCCdecoder::ProcessShortLocoPacket()
-//{
-//    // bits as defined in 9.2
-//    byte addressByte =  packet[0] & 0x7F;
-//    byte directionBit = packet[1] & 0x20;
-//    byte cBit =         packet[1] & 0x10;
-//    byte speedBits =    packet[1] & 0x0F;
-//
-//    // Stop or estop??
-//    if( speedBits==0 )
-//    {
-//        speedBits = kDCC_STOP_SPEED;    
-//    }
-//    else
-//    {
-//        if( speedBits== 1 )
-//        {
-//            speedBits = kDCC_ESTOP_SPEED;
-//        }
-//        else
-//        {            
-//            if( GetCV(kCV_ConfigurationData1) & 0x02 )  // Bit 1 of CV29: 0=14speeds, 1=28Speeds
-//            {
-//                speedBits = ((speedBits << 1 ) & (cBit ? 1 : 0)) - 3;   // speedBits = 1..28
-//            }
-//            else
-//            {
-//                speedBits -= 1;                                         // speedBits = 1..14
-//            }
-//        }
-//    }
-//
-//    // do callback
-//    boolean isPacketForThisAddress = (addressByte == GetCV(kCV_PrimaryAddress));
-//    if (isPacketForThisAddress || returnAllPackets)
-//    {
-//        if(basicControlHandler)
-//            basicControlHandler(addressByte,speedBits,directionBit);
-//    }
-//}
+// Process a loco packet with a short address
+void DCCdecoder::ProcessShortLocoPacket() {}
 
 
 // Process a loco packet with a long address
-void DCCdecoder::ProcessLongLocoPacket()
-{
-    // TODO: Implement long loco packet processing
-}
+void DCCdecoder::ProcessLongLocoPacket() { }
 
 
 // Process an accessory broadcast packet
@@ -387,7 +255,7 @@ void DCCdecoder::ProcessAccBroadcastPacket()
 
     // we got here somehow with an incorrectly identified packet
     if (decodingErrorHandler)
-        decodingErrorHandler(kDCC_ERR_UNKNOWN_PACKET);
+        decodingErrorHandler(DCC_ERR_UNKNOWN_PACKET);
 }
 
 
@@ -400,12 +268,12 @@ void DCCdecoder::ProcessAccPacket()
     // loop through packet specs and check against current packet to identify it
     byte i = 0;
     bool packetIdentified = false;
-    while (!packetIdentified && i < numAccPacketTypes )
-    {
-        if ((comp & accPacketSpec[i].specMask) == accPacketSpec[i].specAns)
-            packetIdentified = true;
-        i++;
-    }
+	while (i < numAccPacketTypes && !packetIdentified)
+	{
+		if ((comp & accPacketSpec[i].specMask) == accPacketSpec[i].specAns)
+			packetIdentified = true;
+		i++;
+	}
 
     // assign the packet type we identified
     AccPacketType accType;
@@ -416,7 +284,7 @@ void DCCdecoder::ProcessAccPacket()
     else    // exit with error if we can't identify the packet
     {
         if (decodingErrorHandler)
-            decodingErrorHandler(kDCC_ERR_UNKNOWN_PACKET);
+            decodingErrorHandler(DCC_ERR_UNKNOWN_PACKET);
         return;
     }
 
@@ -430,8 +298,8 @@ void DCCdecoder::ProcessAccPacket()
     if (accType == LEGACYPOM) outputAddress = (boardAddress << 2) + 1;
 
     // process the packet types
-    boolean isPacketForThisAddress = (outputAddress == Address());
-    if (isPacketForThisAddress || returnAllPackets)
+    boolean isPacketForThisAddress = (outputAddress == decoderSettings.baseAddress);   // TODO: implememnt multiple address support
+    if (isPacketForThisAddress || decoderSettings.returnAllPackets)
     {
         switch (accType)
         {

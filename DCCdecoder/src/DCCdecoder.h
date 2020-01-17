@@ -65,10 +65,6 @@ TODO: The library currently only implements the most basic locomotive functional
 */
 
 
-#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
-#include "EEPROM.h"
-#endif
-
 #include "Bitstream.h"
 #include "DCCpacket.h"
 
@@ -86,38 +82,30 @@ TODO: The library currently only implements the most basic locomotive functional
 class DCCdecoder
 {
 public:
-
-	// CV29 bits  (from NmraDcc.h)
-	enum CV29bits : byte {
-		CV29_LOCO_DIR = 0x01, // bit 0: Locomotive Direction: "0" = normal, "1" = reversed
-		CV29_F0_LOCATION = 0x02, // bit 1: F0 location: "0" = bit 4 in Speed and Direction instructions, 
-		//        "1" = bit 4 in function group one instruction
-		CV29_APS = 0x04, // bit 2: Alternate Power Source (APS) "0" = NMRA Digital only, 
-		//        "1" = Alternate power source set by CV12
-		CV29_ADV_ACK = 0x08, // bit 3: ACK, Advanced Acknowledge mode enabled if 1, disabled if 0
-		CV29_SPEED_TABLE_ENABLE = 0x10, // bit 4: STE, Speed Table Enable, "0" = values in CVs 2, 4 and 6, 
-		//        "1" = Custom table selected by CV 25
-		CV29_EXT_ADDRESSING = 0x20, // bit 5: "0" = one byte addressing, "1" = two byte addressing
-		CV29_OUTPUT_ADDRESS_MODE = 0x40, // bit 6: "0" = Decoder Address Mode, "1" = Output Address Mode
-		CV29_ACCESSORY_DECODER = 0x80, // bit 7: "0" = Multi-Function Decoder Mode, "1" = Accessory Decoder Mode
-	};
-
 	// callback function typedefs
 	typedef void(*IdleResetHandler)(byte byteCount, byte* packetBytes);
 	typedef void(*BasicControlHandler)(int address, int speed, int direction);
 	typedef void(*BasicAccHandler)(int boardAddress, int outputAddress, byte activate, byte data);
 	typedef void(*ExtendedAccHandler)(int boardAddress, int outputAddress, byte data);
 	typedef void(*AccPomHandler)(int boardAddress, int outputAddress, byte instructionType, int cv, byte data);
-	typedef void(*CVUpdateHandler)(int CV, byte oldValue, byte newValue);
 
 	typedef void(*BitstreamErrorHandler)(byte ErrorCode);
 	typedef void(*PacketErrorHandler)(byte ErrorCode);
 	typedef void(*DecodingErrorHandler)(byte ErrorCode);
 
-	// Basic decoder setup (manufacturer ID, CV29 config, all packets option)
+	// Basic decoder setup
+	struct DecoderSettings
+	{
+		uint16_t baseAddress;
+		byte altAddresses;
+		uint16_t altAddress[2];    // TODO: implement multiple decoder addresses
+		bool returnAllPackets;
+	};
+
 	DCCdecoder();
-	DCCdecoder(byte mfgID, byte mfgVers, byte cv29, boolean allPackets);
-	void SetupDecoder(byte mfgID, byte mfgVers, byte cv29, boolean allPackets);
+	explicit DCCdecoder(DecoderSettings settings);
+	bool SetAddress(uint16_t address);
+	bool UpdateSettings(DecoderSettings settings);
 
 	// decoder and bitstream control
 	void ProcessTimeStamps();          // call this regularly for the bitstream object to check
@@ -141,55 +129,27 @@ public:
 	void SetPacketMaxErrorHandler(PacketErrorHandler handler);
 	void SetDecodingErrorHandler(DecodingErrorHandler handler);
 
-	void SetCVUpdateHandler(CVUpdateHandler handler);
-
-	// Read/Write CVs
-	byte GetCV(int cv);
-	boolean SetCV(int cv, byte newValue);
-	boolean CVIsValidForWrite(int cv);
-
-	// Helper function to read decoder address
-	int Address();
-	bool SetAddress(uint16_t address);
-
 private:
 
 	// decoder constants
-	enum DecoderConstants : uint16_t
+	enum LocalConstants : uint16_t
 	{
-		// Multifunction Decoders
-		kDCC_STOP_SPEED = 0xFE,
-		kDCC_ESTOP_SPEED = 0xFF,
-		kCV_PrimaryAddress = 1,
-		kCV_Vstart = 2,
-		kCV_AccelerationRate = 3,
-		kCV_DecelerationRate = 4,
-		kCV_ManufacturerVersionNo = 7,
-		kCV_ManufacturedID = 8,
-		kCV_ExtendedAddress1 = 17,
-		kCV_ExtendedAddress2 = 18,
-		kCV_ConfigurationData1 = 29,
-
-		// Accessory Decoders
-		kCV_AddressLSB = 1,
-		kCV_AddressMSB = 9,
-
-		// DCC_Decoder results/errors
-		kDCC_ERR_UNKNOWN_PACKET = 101,
-
-		// Min and max valid packet lengths
-		kPACKET_LEN_MIN = 3,
-		kPACKET_LEN_MAX = 6,
-
-		// CV 1..256 are supported
-		kCV_MAX = 257,
+		DCC_ERR_UNKNOWN_PACKET = 101,    // DCC_Decoder results/errors
+		PACKET_LEN_MIN = 3,              // Min and max valid packet lengths
+		PACKET_LEN_MAX = 6,
 	};
 
+	DecoderSettings decoderSettings =
+	{
+		1,      // base address
+		0,      // optional addresses
+		{0,0},
+		false,   // return all packets
+	};
 
 	// DCC packet types and identifying specs
 	enum PacketType : byte
 	{
-		UNKNOWNPKT,
 		IDLEPKT,
 		BROADCAST,
 		LOCO_SHORT,
@@ -221,7 +181,6 @@ private:
 	// accessory packet types and specs
 	enum AccPacketType : byte
 	{
-		UNKNOWNACC,
 		BASIC,
 		BASICPOM,
 		EXTENDED,
@@ -248,8 +207,6 @@ private:
 
 	enum : byte { numAccPacketTypes = sizeof(accPacketSpec) / sizeof(AccPacketSpec) };
 
-	uint16_t baseAddress = 1;    // address of the decoder
-
 	// DCC bitstream and packet processors
 	BitStream bitStream;
 	DCCpacket dccPacket{ true, true, 250 };
@@ -257,7 +214,7 @@ private:
 	// bitstream and packet builder related
 	byte bitErrorCount = 0;
 	byte packetErrorCount = 0;
-	enum : byte
+	enum MaxErrors : byte
 	{
 		maxBitErrors = 10,       // number of bit errors before indication
 		maxPacketErrors = 10,     // number of packet errors before bitstream reset
@@ -268,17 +225,16 @@ private:
 	void ProcessPacket(byte *packetData, byte packetSize);
 
 	// packet vars
-	byte packet[kPACKET_LEN_MAX];          // the packet bytes
+	byte packet[PACKET_LEN_MAX];          // the packet bytes
 	byte packetSize = 0;                   // the current packet size
-	PacketType packetType = UNKNOWNPKT;    // the packet type
-	boolean returnAllPackets = false;      // return all packets, not just the ones for the decoder's address
+	PacketType packetType = IDLEPKT;        // the packet type
 	byte lastBitError;
 	byte lastPacketError;
 
 	// Packet processors
 	void ProcessIdlePacket();
 	void ProcessBroadcastPacket();
-	//void ProcessShortLocoPacket();
+	void ProcessShortLocoPacket();
 	void ProcessLongLocoPacket();
 	void ProcessAccBroadcastPacket();
 	void ProcessAccPacket();
@@ -298,8 +254,6 @@ private:
 	PacketErrorHandler packetErrorHandler = 0;
 	PacketErrorHandler packetMaxErrorHandler = 0;
 	DecodingErrorHandler decodingErrorHandler = 0;
-
-	CVUpdateHandler cvUpdateHandler = 0;
 
 	// error handling for bitstream and packet processing
 	void BitStreamError(byte errorCode);

@@ -29,8 +29,8 @@ DCCdecoder dcc;
 
 void BitErrorHandler(byte errorCode)
 {
-    //Serial.print("Bit error, code: ");
-    //Serial.println(errorCode,DEC);
+	//Serial.print("Bit error, code: ");
+	//Serial.println(errorCode,DEC);
 
 	digitalWrite(6, HIGH); delay(100); digitalWrite(6, LOW);
 }
@@ -38,60 +38,68 @@ void BitErrorHandler(byte errorCode)
 
 void PacketErrorHandler(byte errorCode)
 {
-    Serial.print("Packet error, code: ");
-    Serial.println(errorCode,DEC);
+	Serial.print("Packet error, code: ");
+	Serial.println(errorCode, DEC);
 }
 
 
 void DCC_AccessoryDecoderHandler(int boardAddress, int outputAddress, byte activate, byte data)
 {
-    Serial.print("Basic Acc Packet, Board Address: ");
-    Serial.print(boardAddress, DEC);
-    Serial.print("  Output Address: ");
-    Serial.print(outputAddress, DEC);
-    Serial.print("  Activate Bit: ");
-    Serial.print(activate,DEC);
-    Serial.print("  Data: ");
-    Serial.println(data,DEC);
+	Serial.print("Basic Acc Packet, Board Address: ");
+	Serial.print(boardAddress, DEC);
+	Serial.print("  Output Address: ");
+	Serial.print(outputAddress, DEC);
+	Serial.print("  Activate Bit: ");
+	Serial.print(activate, DEC);
+	Serial.print("  Data: ");
+	Serial.println(data, DEC);
 }
 
 
 void DCC_ExtendedAccDecoderHandler(int boardAddress, int outputAddress, byte data)
 {
-    Serial.print("Ext Acc Packet, Board Address: ");
-    Serial.print(boardAddress, DEC);
-    Serial.print("  Output Address: ");
-    Serial.print(outputAddress, DEC);
-    Serial.print("  Data: ");
-    Serial.println(data,DEC);
+	Serial.print("Ext Acc Packet, Board Address: ");
+	Serial.print(boardAddress, DEC);
+	Serial.print("  Output Address: ");
+	Serial.print(outputAddress, DEC);
+	Serial.print("  Data: ");
+	Serial.println(data, DEC);
 }
 
 
 void DCC_BaselineControlHandler(int address, int speed, int direction)
 {
-    Serial.print("Baseline Packet, Loco Address: ");
-    Serial.print(address, DEC);
-    Serial.print("  Speed: ");
-    Serial.print(speed, DEC);
-    Serial.print("  Direction: ");
-    Serial.println(direction,DEC);
+	Serial.print("Baseline Packet, Loco Address: ");
+	Serial.print(address, DEC);
+	Serial.print("  Speed: ");
+	Serial.print(speed, DEC);
+	Serial.print("  Direction: ");
+	Serial.println(direction, DEC);
 }
 
 
-void DCC_AccPomHandler(int boardAddress,int outputAddress, byte instructionType, int cv, byte data)
+void DCC_AccPomHandler(int boardAddress, int outputAddress, byte instructionType, int cv, byte data)
 {
-    Serial.print("Basic Acc POM Packet, Board Address: ");
-    Serial.print(boardAddress, DEC);
-    Serial.print("  Output Address: ");
-    Serial.print(outputAddress, DEC);
-    Serial.print("  Instruction Type: ");
-    Serial.print(instructionType,DEC);
-    Serial.print("  CV: ");
-    Serial.print(cv,DEC);
-    Serial.print("  Data: ");
-    Serial.println(data,DEC);
+	Serial.print("Basic Acc POM Packet, Board Address: ");
+	Serial.print(boardAddress, DEC);
+	Serial.print("  Output Address: ");
+	Serial.print(outputAddress, DEC);
+	Serial.print("  Instruction Type: ");
+	Serial.print(instructionType, DEC);
+	Serial.print("  CV: ");
+	Serial.print(cv, DEC);
+	Serial.print("  Data: ");
+	Serial.println(data, DEC);
 }
 
+
+DCCdecoder::DecoderSettings settings =
+{
+	1,      // base address
+	0,      // optional addresses
+	{0,0},
+	true,   // return all packets
+};
 
 
 // Setup  =================================================================
@@ -109,20 +117,20 @@ void setup()
 	digitalWrite(6, HIGH);
 	delay(1000);
 	digitalWrite(6, LOW);
-	
+
 	Serial.begin(115200);
 
-    dcc.SetupDecoder(0,0,0,true);
-    dcc.SetBasicAccessoryDecoderPacketHandler(&DCC_AccessoryDecoderHandler);
-    dcc.SetExtendedAccessoryDecoderPacketHandler(&DCC_ExtendedAccDecoderHandler);
-    dcc.SetBaselineControlPacketHandler(&DCC_BaselineControlHandler);
-    dcc.SetBasicAccessoryPomPacketHandler(&DCC_AccPomHandler);
+	dcc.UpdateSettings(settings);
+	dcc.SetBasicAccessoryDecoderPacketHandler(&DCC_AccessoryDecoderHandler);
+	dcc.SetExtendedAccessoryDecoderPacketHandler(&DCC_ExtendedAccDecoderHandler);
+	dcc.SetBaselineControlPacketHandler(&DCC_BaselineControlHandler);
+	dcc.SetBasicAccessoryPomPacketHandler(&DCC_AccPomHandler);
 
 	//dcc.SetBitstreamErrorHandler(BitErrorHandler);
 	//dcc.SetPacketErrorHandler(PacketErrorHandler);
 	dcc.SetBitstreamMaxErrorHandler(BitErrorHandler);
 	//dcc.SetPacketMaxErrorHandler(PacketErrorHandler);
-	
+
 	Serial.println("dcc decoder setup complete.");
 
 	dcc.ResumeBitstream();
