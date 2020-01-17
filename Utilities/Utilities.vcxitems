@@ -1,0 +1,39 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <ItemsProjectGuid>{7f1ee0c7-ad77-4abd-9b19-7b9399df7313}</ItemsProjectGuid>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(MSBuildThisFileDirectory)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectCapability Include="SourceItemsFromImports" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="$(MSBuildThisFileDirectory)readme.txt" />
+    <Text Include="$(MSBuildThisFileDirectory)library.properties" />
+    <Text Include="$(MSBuildThisFileDirectory)src\Utilities.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- <ClInclude Include="$(MSBuildThisFileDirectory)Utilities.h" /> -->
+    <ClInclude Include="$(MSBuildThisFileDirectory)src\Button.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)src\CVManager.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)src\EventTimer.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)src\HardwareDebug.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)src\OutputPin.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)src\RGB_LED.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)src\Button.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)src\CVManager.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)src\EventTimer.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)src\HardwareDebug.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)src\OutputPin.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)src\RGB_LED.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)src\Utilities.cpp" />
+  </ItemGroup>
+</Project>
