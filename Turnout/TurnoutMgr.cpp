@@ -52,7 +52,6 @@ TurnoutMgr::TurnoutMgr()
 	// configure servo event handlers
 	for (byte i = 0; i < numServos; i++)
 		servo[i].SetServoMoveDoneHandler(WrapperServoMoveDone);
-	servoTimer.SetTimerHandler(WrapperServoTimer);
 }
 
 
@@ -72,6 +71,7 @@ void TurnoutMgr::Initialize()
 	else
 	{
 		InitMain();
+
 	}
 }
 
@@ -105,9 +105,9 @@ void TurnoutMgr::InitMain()
 	// do the init stuff in TurnoutBase
 	TurnoutBase::InitMain();
 
-	const int lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
-	const int highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
-	servo[0].Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, servoState[0][position]);
+	const int lowSpeed = cv.getCV(CV_servoLowSpeed) * 100;
+	const int highSpeed = cv.getCV(CV_servoHighSpeed) * 100;
+	servo[0].Initialize(cv.getCV(CV_servo1MinTravel), cv.getCV(CV_servo1MaxTravel), lowSpeed, highSpeed, servoState[0][position]);
 
 	// set led and relays, and begin bitstream capture
 	EndServoMove();
@@ -122,7 +122,8 @@ void TurnoutMgr::InitMain()
 void TurnoutMgr::BeginServoMove()
 {
 	// store new position to cv
-	dcc.SetCV(CV_turnoutPosition, position);
+	cv.setCV(CV_turnoutPosition, position);
+	SaveConfig();
 
 	// set the led to indicate servo is in motion
 	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
@@ -192,7 +193,6 @@ void TurnoutMgr::ResetTimerHandler()
 	osCurved.SetButtonPressHandler(WrapperOSCurved);
 
 	// run the main init after the reset timer expires
-	factoryReset = false;
 	InitMain();
 }
 
@@ -318,26 +318,10 @@ void TurnoutMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV
 	TurnoutBase::DCCPomHandler(Addr, instType, CV, Value);
 
 	// update servo vars from eeprom
-	if (CV == CV_servo1MinTravel) servo[0].SetExtent(LOW, dcc.GetCV(CV_servo1MinTravel));
-	if (CV == CV_servo1MaxTravel) servo[0].SetExtent(HIGH, dcc.GetCV(CV_servo1MaxTravel));
-	if (CV == CV_servoLowSpeed) servo[0].SetDuration(LOW, dcc.GetCV(CV_servoLowSpeed) * 100);
-	if (CV == CV_servoHighSpeed) servo[0].SetDuration(HIGH, dcc.GetCV(CV_servoHighSpeed) * 100);
-}
-
-
-// handle decoding errors
-void TurnoutMgr::DCCDecodingError(byte errorCode)
-{
-	if (!showErrorIndication) return;
-
-	// set up timer for LED indication, normal led will resume after this timer expires
-	errorTimer.StartTimer(1000);
-	led.SetLED(RgbLed::CYAN, RgbLed::FLASH);
-
-	#ifdef _DEBUG
-	Serial.print("Packet error, code: ");
-	Serial.println(errorCode, DEC);
-	#endif
+	if (CV == CV_servo1MinTravel) servo[0].SetExtent(LOW, cv.getCV(CV_servo1MinTravel));
+	if (CV == CV_servo1MaxTravel) servo[0].SetExtent(HIGH, cv.getCV(CV_servo1MaxTravel));
+	if (CV == CV_servoLowSpeed) servo[0].SetDuration(LOW, cv.getCV(CV_servoLowSpeed) * 100);
+	if (CV == CV_servoHighSpeed) servo[0].SetDuration(HIGH, cv.getCV(CV_servoHighSpeed) * 100);
 }
 
 
@@ -372,7 +356,7 @@ void TurnoutMgr::WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byt
 
 void TurnoutMgr::WrapperMaxBitErrors(byte errorCode) { currentInstance->TurnoutBase::MaxBitErrorHandler(); }
 void TurnoutMgr::WrapperMaxPacketErrors(byte errorCode) { currentInstance->TurnoutBase::MaxPacketErrorHandler(); }
-void TurnoutMgr::WrapperDCCDecodingError(byte errorCode) { currentInstance->DCCDecodingError(errorCode); }
+void TurnoutMgr::WrapperDCCDecodingError(byte errorCode) { currentInstance->TurnoutBase::DCCDecodingError(); }
 
 
 // timer callback wrappers

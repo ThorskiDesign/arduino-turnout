@@ -59,37 +59,52 @@ void TurnoutBase::Update()
 // Initialize the turnout manager by setting up the dcc config, reading stored values from CVs, and setting up the servo
 void TurnoutBase::InitMain()
 {
-	// Configure and initialize the DCC packet processor (accessory decoder in output address mode)
-	const byte cv29 = DCCdecoder::CV29_ACCESSORY_DECODER | DCCdecoder::CV29_OUTPUT_ADDRESS_MODE;
-	dcc.SetupDecoder(0, 0, cv29, false);
+
+	// configure factory default CVs
+	byte index = 0;
+	index = cv.initCV(index, CV_AddressLSB, 1, 0, 255, false);
+	index = cv.initCV(index, CV_AddressMSB, 0, 0, 255, false);
+	index = cv.initCV(index, CV_servo1MinTravel, 90, 45, 135, false);
+	index = cv.initCV(index, CV_servo1MaxTravel, 90, 45, 135, false);
+	index = cv.initCV(index, CV_servoLowSpeed, 25);
+	index = cv.initCV(index, CV_servoHighSpeed, 0);
+	index = cv.initCV(index, CV_occupancySensorSwap, 0);
+	index = cv.initCV(index, CV_dccCommandSwap, 0);
+	index = cv.initCV(index, CV_relaySwap, 0);
+	index = cv.initCV(index, CV_Aux1Off, 10);
+	index = cv.initCV(index, CV_Aux1On, 11);
+	index = cv.initCV(index, CV_Aux2Off, 20);
+	index = cv.initCV(index, CV_Aux2On, 21);
+	index = cv.initCV(index, CV_positionIndicationToggle, 1);
+	index = cv.initCV(index, CV_errorIndicationToggle, 2);
+	index = cv.initCV(index, CV_turnoutPosition, 0, 0, 1, false);
+	index = cv.initCV(index, CV_servo2MinTravel, 90, 45, 135, false);
+	index = cv.initCV(index, CV_servo2MaxTravel, 90, 45, 135, false);
+	index = cv.initCV(index, CV_servo3MinTravel, 90, 45, 135, false);
+	index = cv.initCV(index, CV_servo3MaxTravel, 90, 45, 135, false);
+	index = cv.initCV(index, CV_servo4MinTravel, 90, 45, 135, false);
+	cv.initCV(index, CV_servo4MaxTravel, 90, 45, 135, false);
+
+	// load config
+	LoadConfig();
+
+	// Initialize the DCC decoder
+	byte addr = (cv.getCV(CV_AddressMSB) << 8) + cv.getCV(CV_AddressLSB);
+	dcc.SetAddress(addr);
 
 	// get variables from cv's
-	dccAddress = dcc.Address();
-	occupancySensorSwap = dcc.GetCV(CV_occupancySensorSwap);
-	dccCommandSwap = dcc.GetCV(CV_dccCommandSwap);
-	relaySwap = dcc.GetCV(CV_relaySwap);
+	occupancySensorSwap = cv.getCV(CV_occupancySensorSwap);
+	dccCommandSwap = cv.getCV(CV_dccCommandSwap);
+	relaySwap = cv.getCV(CV_relaySwap);
 
 	// set the current position based on the stored position
-	position = (dcc.GetCV(CV_turnoutPosition) == 0) ? STRAIGHT : CURVED;
-
-#ifdef _DEBUG
-	Serial.print("Base init done, using dcc address ");
-	Serial.println(dccAddress, DEC);
-	Serial.print("Servo position read from CVs is ");
-	Serial.println(position, DEC);
-#endif
+	position = (cv.getCV(CV_turnoutPosition) == 0) ? STRAIGHT : CURVED;
 }
 
 
 // perform a reset to factory defaults
 void TurnoutBase::FactoryReset(bool HardReset)
 {
-#ifdef _DEBUG
-	Serial.println("Reset to defaults initiated.");
-#endif
-
-	factoryReset = true;    // set flag indicating we are in reset
-
 	// normal initilization will resume after this timer expires
 	const unsigned long resetDelay = 2500;  // time to flash led so we have indication of reset occuring
 	resetTimer.StartTimer(resetDelay);
@@ -99,18 +114,9 @@ void TurnoutBase::FactoryReset(bool HardReset)
 	dcc.SuspendBitstream();
 
 	// do the cv reset
-	const unsigned int numCVs = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
-	for (unsigned int cv = 0; cv < numCVs; cv++)
-	{
-		if (HardReset || FactoryDefaultCVs[cv].SoftReset)
-			dcc.SetCV(FactoryDefaultCVs[cv].CV, FactoryDefaultCVs[cv].Value);
-	}
-
-#ifdef _DEBUG
-	Serial.println("Reset to defaults completed.");
-#endif
+	cv.resetCVs();
+	SaveConfig();
 }
-
 
 
 // ========================================================================================================
@@ -124,6 +130,15 @@ void TurnoutBase::ErrorTimerHandler()
 	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::ON);
 }
 
+void TurnoutBase::MaxBitErrorHandler()
+{
+	if (!showErrorIndication) return;
+
+	// set up timer for LED indication, normal led will resume after this timer expires
+	errorTimer.StartTimer(250);
+	led.SetLED(RgbLed::YELLOW, RgbLed::ON);
+}
+
 void TurnoutBase::MaxPacketErrorHandler()
 {
 	if (!showErrorIndication) return;
@@ -133,14 +148,15 @@ void TurnoutBase::MaxPacketErrorHandler()
 	led.SetLED(RgbLed::YELLOW, RgbLed::ON);
 }
 
-void TurnoutBase::MaxBitErrorHandler()
+void TurnoutBase::DCCDecodingError()
 {
 	if (!showErrorIndication) return;
 
 	// set up timer for LED indication, normal led will resume after this timer expires
-	errorTimer.StartTimer(250);
-	led.SetLED(RgbLed::YELLOW, RgbLed::ON);
+	errorTimer.StartTimer(1000);
+	led.SetLED(RgbLed::CYAN, RgbLed::FLASH);
 }
+
 
 
 // handle a DCC extended accessory command, used for controlling the aux outputs
@@ -155,25 +171,25 @@ void TurnoutBase::DCCExtCommandHandler(unsigned int Addr, unsigned int Data)
 #endif
 
 	// process a matching signal aspect to turn aux outputs on or off
-	if (Data == dcc.GetCV(CV_Aux1Off))
+	if (Data == cv.getCV(CV_Aux1Off))
 	{
 		auxOutput1.SetPin(LOW);
 		return;
 	}
 
-	if (Data == dcc.GetCV(CV_Aux1On))
+	if (Data == cv.getCV(CV_Aux1On))
 	{
 		auxOutput1.SetPin(HIGH);
 		return;
 	}
 
-	if (Data == dcc.GetCV(CV_Aux2Off))
+	if (Data == cv.getCV(CV_Aux2Off))
 	{
 		auxOutput2.SetPin(LOW);
 		return;
 	}
 
-	if (Data == dcc.GetCV(CV_Aux2On))
+	if (Data == cv.getCV(CV_Aux2On))
 	{
 		auxOutput2.SetPin(HIGH);
 		return;
@@ -181,7 +197,7 @@ void TurnoutBase::DCCExtCommandHandler(unsigned int Addr, unsigned int Data)
 
 
 	// process a matching signal aspect to toggle error indication
-	if (Data == dcc.GetCV(CV_errorIndicationToggle))
+	if (Data == cv.getCV(CV_errorIndicationToggle))
 	{
 		showErrorIndication = !showErrorIndication;
 
@@ -226,33 +242,64 @@ void TurnoutBase::DCCPomHandler(unsigned int Addr, byte instType, unsigned int C
 		}
 	}
 
-	// check against our defined CVs to verify that the CV is valid
-	boolean isValidCV = false;
-	const unsigned int numCVs = sizeof(FactoryDefaultCVs) / sizeof(CVPair);
-	for (unsigned int i = 0; i < numCVs; i++)
-	{
-		if (CV == FactoryDefaultCVs[i].CV) isValidCV = true;
-	}
-
-	// set up timer for LED indication, normal led will resume after this timer expires
-	errorTimer.StartTimer(1000);
-
-	// provide indication and exit if CV is invalid
-	if (!isValidCV)
-	{
-		led.SetLED(RgbLed::YELLOW, RgbLed::ON);
-		return;
-	}
-
-	// provide feedback that we are programming a valid CV
-	led.SetLED(RgbLed::BLUE, RgbLed::ON);
-
 	// set the cv
-	dcc.SetCV(CV, Value);
+	if (cv.setCV(CV, Value))
+	{
+		// provide feedback that we are programming a valid CV
+		errorTimer.StartTimer(1000);
+		led.SetLED(RgbLed::BLUE, RgbLed::ON);
+	}
+	else
+	{
+		// or provide indication if CV is invalid
+		errorTimer.StartTimer(1000);
+		led.SetLED(RgbLed::YELLOW, RgbLed::ON);
+	}
 
-	// read back values from eeprom
-	dccAddress = dcc.Address();
-	occupancySensorSwap = dcc.GetCV(CV_occupancySensorSwap);
-	dccCommandSwap = dcc.GetCV(CV_dccCommandSwap);
-	relaySwap = dcc.GetCV(CV_relaySwap);
+	SaveConfig();
+
+	// read back values from cv manager
+	occupancySensorSwap = cv.getCV(CV_occupancySensorSwap);
+	dccCommandSwap = cv.getCV(CV_dccCommandSwap);
+	relaySwap = cv.getCV(CV_relaySwap);
+}
+
+
+void TurnoutBase::LoadConfig()
+{
+	const bool firstBoot = (EEPROM.read(0) == 255);    // default value for unwritten eeprom
+
+	if (firstBoot)
+	{ 
+
+		// reset cvs to defaults and save
+		cv.resetCVs();
+		SaveConfig();
+	}
+	else
+	{
+
+		// load stored config struct
+		EEPROM.get(0, configVars);
+
+		// copy stored config to working CVs
+		for (byte i = 0; i < numCVindexes; i++)
+		{
+
+			cv.cv[i].cvValue = configVars.CVs[i];
+		}
+	}
+}
+
+void TurnoutBase::SaveConfig()
+{
+	// copy working CVs to our storage object
+	for (byte i = 0; i < numCVindexes; i++)
+	{
+		configVars.CVs[i] = cv.cv[i].cvValue;
+
+	}
+
+	// store the config
+	EEPROM.put(0, configVars);
 }

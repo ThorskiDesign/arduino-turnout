@@ -36,10 +36,6 @@ XoverMgr::XoverMgr()
 	osAB.SetButtonPressHandler(WrapperOSAB);
 	osCD.SetButtonPressHandler(WrapperOSCD);
 
-	// assign handler for servo move done events
-	for (byte i = 0; i < numServos; i++)
-		servo[i].SetServoMoveDoneHandler(WrapperServoMoveDone);
-
 	// configure dcc event handlers
 	dcc.SetBasicAccessoryDecoderPacketHandler(WrapperDCCAccPacket);
 	dcc.SetExtendedAccessoryDecoderPacketHandler(WrapperDCCExtPacket);
@@ -52,6 +48,10 @@ XoverMgr::XoverMgr()
 	errorTimer.SetTimerHandler(WrapperErrorTimer);
 	resetTimer.SetTimerHandler(WrapperResetTimer);
 	servoTimer.SetTimerHandler(WrapperServoTimer);
+
+	// configure servo event handlers
+	for (byte i = 0; i < numServos; i++)
+		servo[i].SetServoMoveDoneHandler(WrapperServoMoveDone);
 }
 
 
@@ -99,12 +99,12 @@ void XoverMgr::InitMain()
 	TurnoutBase::InitMain();
 
 	// servo setup - get extents, rates, and last position from cv's
-	const int lowSpeed = dcc.GetCV(CV_servoLowSpeed) * 100;
-	const int highSpeed = dcc.GetCV(CV_servoHighSpeed) * 100;
-	servo[0].Initialize(dcc.GetCV(CV_servo1MinTravel), dcc.GetCV(CV_servo1MaxTravel), lowSpeed, highSpeed, servoState[0][position]);
-	servo[1].Initialize(dcc.GetCV(CV_servo2MinTravel), dcc.GetCV(CV_servo2MaxTravel), lowSpeed, highSpeed, servoState[1][position]);
-	servo[2].Initialize(dcc.GetCV(CV_servo3MinTravel), dcc.GetCV(CV_servo3MaxTravel), lowSpeed, highSpeed, servoState[2][position]);
-	servo[3].Initialize(dcc.GetCV(CV_servo4MinTravel), dcc.GetCV(CV_servo4MaxTravel), lowSpeed, highSpeed, servoState[3][position]);
+	const int lowSpeed = cv.getCV(CV_servoLowSpeed) * 100;
+	const int highSpeed = cv.getCV(CV_servoHighSpeed) * 100;
+	servo[0].Initialize(cv.getCV(CV_servo1MinTravel), cv.getCV(CV_servo1MaxTravel), lowSpeed, highSpeed, servoState[0][position]);
+	servo[1].Initialize(cv.getCV(CV_servo2MinTravel), cv.getCV(CV_servo2MaxTravel), lowSpeed, highSpeed, servoState[1][position]);
+	servo[2].Initialize(cv.getCV(CV_servo3MinTravel), cv.getCV(CV_servo3MaxTravel), lowSpeed, highSpeed, servoState[2][position]);
+	servo[3].Initialize(cv.getCV(CV_servo4MinTravel), cv.getCV(CV_servo4MaxTravel), lowSpeed, highSpeed, servoState[3][position]);
 
 	// set led and relays, and begin bitstream capture
 	EndServoMove();
@@ -119,13 +119,13 @@ void XoverMgr::InitMain()
 void XoverMgr::BeginServoMove()
 {
 	// store new position to cv
-	dcc.SetCV(CV_turnoutPosition, position);
+	cv.setCV(CV_turnoutPosition, position);
+	SaveConfig();
 
 	// set the led to indicate servo is in motion
 	led.SetLED((position == STRAIGHT) ? RgbLed::GREEN : RgbLed::RED, RgbLed::FLASH);
 
 	// stop the bitstream capture
-	//bitStream.Suspend();
 	dcc.SuspendBitstream();
 
 	// turn off the relays
@@ -165,7 +165,6 @@ void XoverMgr::EndServoMove()
 
 	// resume the bitstream capture
 	servosActive = false;
-	//bitStream.Resume();
 	dcc.ResumeBitstream();
 }
 
@@ -186,7 +185,6 @@ void XoverMgr::ResetTimerHandler()
 	osCD.SetButtonPressHandler(WrapperOSCD);
 
 	// run the main init after the reset timer expires
-	factoryReset = false;
 	InitMain();
 }
 
@@ -258,7 +256,7 @@ void XoverMgr::DCCAccCommandHandler(unsigned int Addr, unsigned int Direction)
 	State dccState = (Direction == 0) ? CURVED : STRAIGHT;
 	if (dccCommandSwap) dccState = (State)!dccState; // swap the interpretation of dcc command if needed
 
-													 // if we are already in the desired position, just exit
+	// if we are already in the desired position, just exit
 	if (dccState == position) return;
 
 #ifdef _DEBUG
@@ -290,43 +288,25 @@ void XoverMgr::DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, 
 	TurnoutBase::DCCPomHandler(Addr, instType, CV, Value);
 
 	// update servo vars from eeprom
-	if (CV == CV_servo1MinTravel) servo[0].SetExtent(LOW, dcc.GetCV(CV_servo1MinTravel));
-	if (CV == CV_servo1MaxTravel) servo[0].SetExtent(HIGH, dcc.GetCV(CV_servo1MaxTravel));
+	if (CV == CV_servo1MinTravel) servo[0].SetExtent(LOW, cv.getCV(CV_servo1MinTravel));
+	if (CV == CV_servo1MaxTravel) servo[0].SetExtent(HIGH, cv.getCV(CV_servo1MaxTravel));
 
-	if (CV == CV_servo2MinTravel) servo[1].SetExtent(LOW, dcc.GetCV(CV_servo2MinTravel));
-	if (CV == CV_servo2MaxTravel) servo[1].SetExtent(HIGH, dcc.GetCV(CV_servo2MaxTravel));
+	if (CV == CV_servo2MinTravel) servo[1].SetExtent(LOW, cv.getCV(CV_servo2MinTravel));
+	if (CV == CV_servo2MaxTravel) servo[1].SetExtent(HIGH, cv.getCV(CV_servo2MaxTravel));
 
-	if (CV == CV_servo3MinTravel) servo[2].SetExtent(LOW, dcc.GetCV(CV_servo3MinTravel));
-	if (CV == CV_servo3MaxTravel) servo[2].SetExtent(HIGH, dcc.GetCV(CV_servo3MaxTravel));
+	if (CV == CV_servo3MinTravel) servo[2].SetExtent(LOW, cv.getCV(CV_servo3MinTravel));
+	if (CV == CV_servo3MaxTravel) servo[2].SetExtent(HIGH, cv.getCV(CV_servo3MaxTravel));
 
-	if (CV == CV_servo4MinTravel) servo[3].SetExtent(LOW, dcc.GetCV(CV_servo4MinTravel));
-	if (CV == CV_servo4MaxTravel) servo[3].SetExtent(HIGH, dcc.GetCV(CV_servo4MaxTravel));
+	if (CV == CV_servo4MinTravel) servo[3].SetExtent(LOW, cv.getCV(CV_servo4MinTravel));
+	if (CV == CV_servo4MaxTravel) servo[3].SetExtent(HIGH, cv.getCV(CV_servo4MaxTravel));
 	
 	if (CV == CV_servoLowSpeed)
 		for (byte i = 0; i < numServos; i++)
-			servo[i].SetDuration(LOW, dcc.GetCV(CV_servoLowSpeed) * 100);
+			servo[i].SetDuration(LOW, cv.getCV(CV_servoLowSpeed) * 100);
 	if (CV == CV_servoHighSpeed)
 		for (byte i = 0; i < numServos; i++)
-			servo[i].SetDuration(HIGH, dcc.GetCV(CV_servoHighSpeed) * 100);
+			servo[i].SetDuration(HIGH, cv.getCV(CV_servoHighSpeed) * 100);
 }
-
-
-
-// handle decoding errors
-void XoverMgr::DCCDecodingError(byte errorCode)
-{
-	if (!showErrorIndication) return;
-
-	// set up timer for LED indication, normal led will resume after this timer expires
-	errorTimer.StartTimer(1000);
-	led.SetLED(RgbLed::CYAN, RgbLed::FLASH);
-
-	#ifdef _DEBUG
-	Serial.print("Packet error, code: ");
-	Serial.println(errorCode, DEC);
-	#endif
-}
-
 
 
 // ========================================================================================================
@@ -360,7 +340,7 @@ void XoverMgr::WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byte 
 
 void XoverMgr::WrapperMaxBitErrors(byte errorCode) { currentInstance->TurnoutBase::MaxBitErrorHandler(); }
 void XoverMgr::WrapperMaxPacketErrors(byte errorCode) { currentInstance->TurnoutBase::MaxPacketErrorHandler(); }
-void XoverMgr::WrapperDCCDecodingError(byte errorCode) { currentInstance->DCCDecodingError(errorCode); }
+void XoverMgr::WrapperDCCDecodingError(byte errorCode) { currentInstance->TurnoutBase::DCCDecodingError(); }
 
 
 // timer callback wrappers

@@ -132,7 +132,6 @@ private:
 	void OSCDHandler(bool ButtonState);
 	void DCCAccCommandHandler(unsigned int Addr, unsigned int Direction);
 	void DCCPomHandler(unsigned int Addr, byte instType, unsigned int CV, byte Value);
-	void DCCDecodingError(byte errorCode);
 
 	// pointer to allow us to access member objects from callbacks
 	static XoverMgr *currentInstance;
@@ -147,7 +146,6 @@ private:
 	static void WrapperDCCAccPacket(int boardAddress, int outputAddress, byte activate, byte data);
 	static void WrapperDCCExtPacket(int boardAddress, int outputAddress, byte data);
 	static void WrapperDCCAccPomPacket(int boardAddress, int outputAddress, byte instructionType, int cv, byte data);
-	static void WrapperDCCDecodingError(byte errorCode);
 
 	// Turnout manager event handler wrappers
 	static void WrapperResetTimer();
@@ -157,6 +155,7 @@ private:
 	// Wrappers for events in Turnoutbase
 	static void WrapperMaxBitErrors(byte errorCode);
 	static void WrapperMaxPacketErrors(byte errorCode);
+	static void WrapperDCCDecodingError(byte errorCode);
 };
 
 #endif
