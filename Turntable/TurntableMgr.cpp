@@ -49,9 +49,7 @@ void TurntableMgr::Initialize()
 	errorTimer.SetTimerHandler(WrapperErrorTimerHandler);
 
 	#if defined(WITH_DCC)
-	// Configure and initialize the DCC packet processor (accessory decoder in output address mode)
-	const byte cv29 = DCCdecoder::CV29_ACCESSORY_DECODER | DCCdecoder::CV29_OUTPUT_ADDRESS_MODE;
-	dcc.SetupDecoder(0, 0, cv29, false);
+	// Configure and initialize the DCC packet processor
 	byte addr = (configCVs.getCV(CV_AddressMSB) << 8) + configCVs.getCV(CV_AddressLSB);
 	dcc.SetAddress(addr);
 
@@ -521,15 +519,8 @@ void TurntableMgr::LoadConfig()
 
 void TurntableMgr::LoadConfig(bool reset)
 {
-	//// determine reset or normal boot
-	//#if defined(ADAFRUIT_METRO_M0_EXPRESS)
-	//const bool firstBoot = !stateVars.isValid;   //  isValid should be false on first boot, but
-	//											 //  must load state from flash before loading config
-	//#else
-	//const bool firstBoot = (EEPROM.read(0) == 255);    // default value for unwritten eeprom
-	//#endif
-
 	// if this is the first boot on fresh eeprom/flash, or reset requested
+	// NOTE: must load state from flash before loading config so that stateVars is set properly
 	if (!stateVars.isValid || reset)   
 	{
 
