@@ -151,8 +151,6 @@ void TurntableMgr::StateMoving()
 
 void TurntableMgr::StateSeek()
 {
-	hallSensor.Update();
-
 	switch (subState)
 	{
 	case 0:                 // transition to seek state
@@ -164,51 +162,53 @@ void TurntableMgr::StateSeek()
 		// start moving in a complete clockwise circle at normal speed
 		accelStepper.setMaxSpeed(stepperMaxSpeed / 2);
 		accelStepper.setAcceleration(stepperAcceleration);
-		accelStepper.move(360 * stepsPerDegree);
+		accelStepper.move(360U * stepsPerDegree);
 
-		attachInterrupt(digitalPinToInterrupt(hallSensorPin), HallIrq, RISING);
+		flasher.SetLED(RgbLed::RED, RgbLed::OFF);
 
 		subState = 1;
 		break;
 	case 1:    // CW rotation, waiting for hall sensor to go low, indicating magnet has entered its detection area
+			   // TODO: investigate why debouncing is needed, rather than using falling/rising irq combo
 		if (!hallSensor.SwitchState())
 		{
+			attachInterrupt(digitalPinToInterrupt(hallSensorPin), HallIrq, RISING);
 			flasher.SetLED(RgbLed::RED, RgbLed::ON);
 			subState = 2;   // found it, go to next state
 		}
 		break;
 	case 2:    // CW rotation, waiting for IRQ callback to set subState = 3
-		//if (hallSensor.SwitchState()) 
-		//{
-		//	homePosition = findFullStep(accelStepper.currentPosition());
-		//	subState = 3;
-		//}
 		break;
 	case 3:    // now we've swung past in the CW direction and our home position is set (in the IRQ)
 		flasher.SetLED(RgbLed::RED, RgbLed::OFF);
 		detachInterrupt(digitalPinToInterrupt(hallSensorPin));
 		accelStepper.stop();     // set the stepper to stop with its current speed/accel settings
-		subState = 4;
+		subState = 4;            // indicate successful sensor detection
 		break;
-	case 4:    // waiting for CW motion to stop
-		if (accelStepper.distanceToGo() == 0)
+	}
+
+	// once we stop, check if we found home and set it
+	if (accelStepper.distanceToGo() == 0)
+	{
+		if (subState == 4)   // we successfully found both edges of the hall sensor and have a valid home position
 		{
 			// now that we have stopped, set our home position
 			int16_t delta = accelStepper.currentPosition() - homePosition;
 			accelStepper.setCurrentPosition(delta);
 		}
-		break;
-	}
+		else
+		{
+			// we went a full circle without detecting the correct edge of the hall sensor
+			errorTimer.StartTimer(5000);
+			flasher.SetLED(RgbLed::RED, RgbLed::FLASH, 250, 250);
+		}
 
-	// When we stop after substate 5, or if we miss a hall sensor event and go full circle, end the move
-	if (accelStepper.distanceToGo() == 0)
-		RaiseEvent(MOVE_DONE);      // motion has stopped, raise event to exit seek state
+		RaiseEvent(MOVE_DONE);
+	}
 
 	// do the update functions for this state
 	hallSensor.Update();
 	accelStepper.run();
-	//hallSensor.Update();
-	//flasher.Update();
 }
 
 

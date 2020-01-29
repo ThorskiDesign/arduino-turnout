@@ -27,22 +27,27 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Touchpad-test", "Touchpad-t
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TouchpadLibs", "TouchpadLibs\TouchpadLibs.vcxitems", "{BDB37406-BC41-402D-B547-9DAEF2D04D3F}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Utilities", "Utilities\Utilities.vcxitems", "{7F1EE0C7-AD77-4ABD-9B19-7B9399DF7313}"
+EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		TouchpadLibs\TouchpadLibs.vcxitems*{043f0e48-5914-4810-9d44-69dd3fe4dd18}*SharedItemsImports = 4
 		DCCdecoder\DCCdecoder.vcxitems*{5499bc36-5de3-4166-b157-44140114f299}*SharedItemsImports = 4
 		TurnoutLibs\TurnoutLibs.vcxitems*{5499bc36-5de3-4166-b157-44140114f299}*SharedItemsImports = 4
+		Utilities\Utilities.vcxitems*{5499bc36-5de3-4166-b157-44140114f299}*SharedItemsImports = 4
 		DCCdecoder\DCCdecoder.vcxitems*{738749ae-e647-48ae-8ab0-3924039ee46f}*SharedItemsImports = 4
 		DCCdecoder\DCCdecoder.vcxitems*{7bd72989-cad1-484f-a095-08e36f3875cc}*SharedItemsImports = 4
 		DCCdecoder\DCCdecoder.vcxitems*{7d496680-f1b8-43f0-8b6a-e927f922dc15}*SharedItemsImports = 4
 		TurnoutLibs\TurnoutLibs.vcxitems*{7d496680-f1b8-43f0-8b6a-e927f922dc15}*SharedItemsImports = 4
+		Utilities\Utilities.vcxitems*{7d496680-f1b8-43f0-8b6a-e927f922dc15}*SharedItemsImports = 4
+		Utilities\Utilities.vcxitems*{7f1ee0c7-ad77-4abd-9b19-7b9399df7313}*SharedItemsImports = 9
 		DCCdecoder\DCCdecoder.vcxitems*{9133b2ab-915e-4c35-b94b-320a8a38ef94}*SharedItemsImports = 4
 		DCCdecoder\DCCdecoder.vcxitems*{b843bc4f-191b-488c-b26d-ebf8ffa4254d}*SharedItemsImports = 4
 		TurnoutLibs\TurnoutLibs.vcxitems*{b843bc4f-191b-488c-b26d-ebf8ffa4254d}*SharedItemsImports = 4
 		TouchpadLibs\TouchpadLibs.vcxitems*{bdb37406-bc41-402d-b547-9daef2d04d3f}*SharedItemsImports = 9
 		DCCdecoder\DCCdecoder.vcxitems*{c5f80730-f44f-4478-bdae-6634efc2ca88}*SharedItemsImports = 4
 		TouchpadLibs\TouchpadLibs.vcxitems*{c5f80730-f44f-4478-bdae-6634efc2ca88}*SharedItemsImports = 4
-		TurnoutLibs\TurnoutLibs.vcxitems*{c5f80730-f44f-4478-bdae-6634efc2ca88}*SharedItemsImports = 4
+		Utilities\Utilities.vcxitems*{c5f80730-f44f-4478-bdae-6634efc2ca88}*SharedItemsImports = 4
 		TurnoutLibs\TurnoutLibs.vcxitems*{cc6dfd6e-c8a3-4672-b882-cfa7b5a6918b}*SharedItemsImports = 9
 		DCCdecoder\DCCdecoder.vcxitems*{d37241a3-8830-420e-b1ed-e12ecc374072}*SharedItemsImports = 9
 	EndGlobalSection

@@ -19,22 +19,10 @@
   </ItemGroup>
   <ItemGroup>
     <!-- <ClInclude Include="$(MSBuildThisFileDirectory)TurnoutLibs.h" /> -->
-    <ClCompile Include="$(MSBuildThisFileDirectory)src\Button.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)src\CVManager.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)src\EventTimer.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)src\HardwareDebug.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)src\OutputPin.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)src\RGB_LED.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)src\TurnoutBase.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)src\TurnoutServo.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="$(MSBuildThisFileDirectory)src\Button.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)src\CVManager.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)src\EventTimer.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)src\HardwareDebug.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)src\OutputPin.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)src\RGB_LED.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)src\TurnoutBase.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)src\TurnoutServo.h" />
   </ItemGroup>
