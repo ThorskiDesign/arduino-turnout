@@ -116,13 +116,16 @@ enum : byte
 };
 
 // set the timer/prescaler combination to use
+#if !defined(ADAFRUIT_METRO_M0_EXPRESS)
 //#define TIMER1_HW_0PS    // use timer1 hardware irq with no prescaler
 //#define TIMER1_HW_8PS    // use timer1 hardware irq with 8 prescaler
-//#define TIMER1_ICR_0PS   // use timer1 input capture register with no prescaler
+#define TIMER1_ICR_0PS   // use timer1 input capture register with no prescaler
 //#define TIMER1_ICR_8PS   // use timer1 input capture register with 8 prescaler
 //#define TIMER2_HW_8PS    // use timer2 hardware irq with 8 prescaler
 //#define TIMER2_HW_32PS   // use timer2 hardware irq with 32 prescaler
+#else
 #define TIMER_ARM_HW_8PS   // use timer on arm with hardware irq with 8 prescaler
+#endif
 
 // use standard DCC timings for ICR
 #if defined(TIMER1_ICR_0PS) || defined(TIMER1_ICR_8PS)

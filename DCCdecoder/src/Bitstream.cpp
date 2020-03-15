@@ -361,6 +361,7 @@ void BitStream::ArmTimerSetup()
 	// Enable clock for TC 
 	//REG_GCLK_CLKCTRL =  (uint16_t)(GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_GEN_GCLK0 | GCLK_CLKCTRL_ID(GCM_TCC2_TC3));
 	GCLK->CLKCTRL.reg = (uint16_t)(GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_GEN_GCLK0 | GCLK_CLKCTRL_ID(GCM_TCC2_TC3));
+	//GCLK->CLKCTRL.reg = (uint16_t)(GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_GEN(4) | GCLK_CLKCTRL_ID(GCM_TC4_TC5));
 	while (GCLK->STATUS.bit.SYNCBUSY == 1); // wait for sync 
 
 	// The type cast must fit with the selected timer mode 
