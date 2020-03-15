@@ -5,7 +5,7 @@
 */
 
 
-#include "src/Touchpad.h"
+#include "Touchpad.h"
 Touchpad touchpad;
 
 // the setup function runs once when you press reset or power the board

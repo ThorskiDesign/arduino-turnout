@@ -196,7 +196,7 @@ void Touchpad::ConfigureRunPage()
 	button[8].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (2 * xs) + xoff, (4 * ys) + yoff, 60, 40, "9", numpad9);
 
 	// reverse button
-	button[12].Init(&display, GraphicButton::MOMENTARY, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (5 * ys) + yoff, 200, 40, "Reverse", runReverse);
+	button[12].Init(&display, GraphicButton::LATCHING, GraphicButton::ROUNDRECT, (0 * xs) + xoff, (5 * ys) + yoff, 200, 40, "Reverse", runReverse);
 
 	// mode buttons
 	xs = 110;
@@ -273,6 +273,7 @@ bool Touchpad::IsSidingButton(byte buttonID)
 	case numpad7:
 	case numpad8:
 	case numpad9:
+	case runReverse:     // include reverse button so selection is clearer, and siding buttons get reset
 		return  true;
 	default:
 		return false;
