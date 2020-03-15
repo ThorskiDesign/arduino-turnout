@@ -65,6 +65,7 @@ void TurntableMgr::Initialize()
 	#if defined(WITH_TOUCHSCREEN)
 	touchpad.Init();
 	touchpad.SetGraphicButtonHandler(WrapperGraphicButtonHandler);
+	touchpad.SetButtonPress(currentSiding, true);    // set display to show initial siding on startup
 	#endif // defined(WITH_TOUCHSCREEN)
 
 	// start the state machine
@@ -383,7 +384,13 @@ void TurntableMgr::MoveToSiding()
 	moveCmd.type = MoveCmd::normal;    // reset for normal move if it was reversed
 
 	// do the move
-	if (moveSteps != 0) accelStepper.move(moveSteps);
+	if (moveSteps != 0)
+		accelStepper.move(moveSteps);
+	else
+	{   // workaround to apply holding torque without moving (much...)
+		StepperClockwiseStep();
+		StepperCounterclockwiseStep();
+	}
 
 	previousSiding = currentSiding;   // for debug purposes
 }
@@ -475,25 +482,27 @@ void TurntableMgr::SaveState()
 
 void TurntableMgr::LoadState()
 {
+	// determine if first boot or not
 	#if defined(ADAFRUIT_METRO_M0_EXPRESS)
 	StateVars tempStateVars = flashState.read();
 	const bool firstBoot = !tempStateVars.isValid;  // this is false on read of unitialized flash
 	#else
 	const bool firstBoot = (EEPROM.read(0) == 255);
 	#endif
-
-	if (!firstBoot)   // if not first boot, then load stored state, otherwise use default statevars initialization
+	
+	// if not first boot, then load stored state, otherwise use default statevars initialization below
+	if (!firstBoot)   
 	{
-
 		#if defined(ADAFRUIT_METRO_M0_EXPRESS)
 		stateVars = tempStateVars;
 		#else
 		EEPROM.get(0, stateVars);    // get the last state from eeprom
 		#endif // defined(ADAFRUIT_METRO_M0_EXPRESS)
-
-		currentState = stateVars.currentState;
-		currentSiding = stateVars.currentSiding;
 	}
+
+	// set state and siding locals
+	currentState = stateVars.currentState;
+	currentSiding = stateVars.currentSiding;
 }
 
 void TurntableMgr::SaveConfig()
@@ -602,6 +611,10 @@ void TurntableMgr::CommandHandler(byte buttonID, bool state)
 			break;
 		case Touchpad::runReverse:
 			moveCmd.type = MoveCmd::reverse;  // this gets reset after the reverse move is complete
+
+			#if defined(WITH_TOUCHSCREEN)
+			touchpad.SetButtonPress(Touchpad::runReverse, true);
+			#endif
 			break;
 
 		// calibration commands

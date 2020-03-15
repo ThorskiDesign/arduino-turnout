@@ -46,8 +46,12 @@ private:
 
 	// hardware assignments ============================================================================
 
+	enum hardwareAssingments : byte {
+		hallSensorPin = 3,
+		LEDPin = 14,
+	};
+
 	//const byte HWirqPin = 2;       set in bitstream.h
-	enum : byte { hallSensorPin = 3 };
 	//const byte microSDPin = 4;
 	//const byte backlightPin = 5;
 	//const byte speakerPin = 6;
@@ -58,7 +62,6 @@ private:
 	//const byte ICSP_MOSI_Pin = 11;   // these are the defaults for the adafruilt display
 	//const byte ICSP_MISO_Pin = 12;
 	//const byte ICS_PSCLK_Pin = 13;
-	enum : byte { LEDPin = 14 };
 
 
 	// State machine ======================================================================================
@@ -181,7 +184,7 @@ private:
 
 	// stepper motor and related =================================================================
 
-	enum : uint16_t
+	enum stepperParameters : uint16_t
 	{
 		stepperStepsPerRev = 200,
 		stepperMicroSteps = 16,
@@ -212,7 +215,7 @@ private:
 	#endif	// WITH_DCC
 
 	// define our available cv's  (allowable range 33-81 per 9.2.2)
-	enum : byte
+	enum availableCVs : byte
 	{
 		CV_AddressLSB = 1,                   // low byte of address
 		CV_AddressMSB = 9,                   // high byte of address
@@ -221,14 +224,14 @@ private:
 	};
 
 	// factory reset cv's
-	enum : byte
+	enum resetCVs : byte
 	{
 		CV_reset = 55,
 		CV_softResetValue = 11,
 		CV_hardResetValue = 55,
 	};
 
-	enum : byte { numCVindexes = 5, numSidingIndexes = 18 };
+	enum CVindexes : byte { numCVindexes = 5, numSidingIndexes = 18 };
 	CVManager configCVs{ numCVindexes };
 	CVManager sidingCVs{ numSidingIndexes };
 
@@ -248,7 +251,7 @@ public:       // these are public so we can use them with FlashStorage globals
 
 private:
 	ConfigVars configVars;
-	StateVars stateVars = { IDLE, 0, false };
+	StateVars stateVars = { IDLE, 1, false };
 
 	void SaveState();
 	void LoadState();
