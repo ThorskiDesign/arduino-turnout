@@ -231,7 +231,10 @@ private:
 		CV_hardResetValue = 55,
 	};
 
-	enum CVindexes : byte { numCVindexes = 5, numSidingIndexes = 18 };
+	enum CVindexes : byte {
+		numCVindexes = 5,
+		numSidingIndexes = 36   // note sidingIndexes is 2x number of sidings as they are 16 bit CVs
+	};
 	CVManager configCVs{ numCVindexes };
 	CVManager sidingCVs{ numSidingIndexes };
 

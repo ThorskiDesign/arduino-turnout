@@ -42,6 +42,15 @@ public:
 		numpad7 = 7,
 		numpad8 = 8,
 		numpad9 = 9,
+		numpad10 = 10,
+		numpad11 = 11,
+		numpad12 = 12,
+		numpad13 = 13,
+		numpad14 = 14,
+		numpad15 = 15,
+		numpad16 = 16,
+		numpad17 = 17,
+		numpad18 = 18,
 
 		setup10CW = 21,
 		setup10CCW = 22,
@@ -57,8 +66,9 @@ public:
 		setupHome = 40,
 		setupSet = 41,
 
-		modeRun = 50,
-		modeSetup = 51,
+		modeRun1 = 50,
+		modeRun2 = 51,
+		modeSetup = 52,
 
 		estop = 110,
 	};
@@ -127,15 +137,19 @@ private:
 	uint32_t currentMillis = 0;
 
 	void ConfigureTouchscreen();
-	void ConfigureRunPage();
+	void ConfigureRunPage1();
+	void ConfigureRunPage2();
 	void ConfigureSetupPage();
 
 	// button setup
-	enum : byte { numButtons = 13 };
+	enum : byte {
+		numButtons = 14,
+		groupNone = 0,
+		groupSiding = 1,
+	};
 	GraphicButton button[numButtons];
 
 	// event handlers
-	bool IsSidingButton(byte buttonID);
 	void ButtonPress(GraphicButton* btn);
 	void ButtonRelease(GraphicButton* b);
 

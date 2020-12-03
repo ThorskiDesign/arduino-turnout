@@ -34,7 +34,16 @@ void TurntableMgr::Initialize()
 	index = sidingCVs.initCV16(index, 6, 256, 0, 180U * stepsPerDegree);
 	index = sidingCVs.initCV16(index, 7, 27472, 0, 180U * stepsPerDegree);
 	index = sidingCVs.initCV16(index, 8, 8288, 0, 180U * stepsPerDegree);
-	sidingCVs.initCV16(index, 9, 10 * stepsPerDegree, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 9, 0, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 10, 0, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 11, 0, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 12, 0, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 13, 0, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 14, 0, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 15, 0, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 16, 0, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 17, 0, 0, 180U * stepsPerDegree);
+	index = sidingCVs.initCV16(index, 18, 0, 0, 180U * stepsPerDegree);
 
 	// load config and last saved state
 	LoadState();
@@ -593,6 +602,15 @@ void TurntableMgr::CommandHandler(byte buttonID, bool state)
 		case Touchpad::numpad7:
 		case Touchpad::numpad8:
 		case Touchpad::numpad9:
+		case Touchpad::numpad10:
+		case Touchpad::numpad11:
+		case Touchpad::numpad12:
+		case Touchpad::numpad13:
+		case Touchpad::numpad14:
+		case Touchpad::numpad15:
+		case Touchpad::numpad16:
+		case Touchpad::numpad17:
+		case Touchpad::numpad18:
 			currentSiding = buttonID;
 			moveCmd.targetPos = sidingCVs.getCV(currentSiding);
 
@@ -602,7 +620,8 @@ void TurntableMgr::CommandHandler(byte buttonID, bool state)
 
 			RaiseEvent(BUTTON_SIDING);
 			break;
-		case Touchpad::modeRun:
+		case Touchpad::modeRun1:
+		case Touchpad::modeRun2:
 			#if defined(WITH_TOUCHSCREEN)
 			touchpad.SetButtonPress(currentSiding, true);
 			#endif

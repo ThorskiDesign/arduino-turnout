@@ -6,7 +6,7 @@ GraphicButton::GraphicButton()
 }
 
 void GraphicButton::Init(Adafruit_ILI9341* tft, GraphicButtonType t, GraphicButtonShape shp,
-	unsigned int xp, unsigned int yp, byte xs, byte ys, String lbl, byte id)
+	unsigned int xp, unsigned int yp, byte xs, byte ys, String lbl, byte id, byte group)
 {
 	tftdisplay = tft;
 	type = t;
@@ -22,6 +22,7 @@ void GraphicButton::Init(Adafruit_ILI9341* tft, GraphicButtonType t, GraphicButt
 	showLabel = true;
 	active = true;
 	state = false;
+	buttonGroup = group;
 
 	UpdateBoundingBox();
 }
@@ -144,4 +145,9 @@ GraphicButton::GraphicButtonType GraphicButton::Type()
 byte GraphicButton::ButtonID()
 {
 	return btnID;
+}
+
+byte GraphicButton::ButtonGroup()
+{
+	return buttonGroup;
 }

@@ -32,7 +32,7 @@ public:
 
 	GraphicButton();
 	void Init(Adafruit_ILI9341* tft, GraphicButtonType t, GraphicButtonShape shp,
-		unsigned int xp, unsigned int yp, byte xs, byte ys, String lbl, byte id);
+		unsigned int xp, unsigned int yp, byte xs, byte ys, String lbl, byte id, byte group);
 	void SetLabel(String l, bool show);
 	void SetActive(bool isActive);
 	bool Contains(unsigned int x, unsigned int y);
@@ -41,6 +41,7 @@ public:
 	void DrawButton();         // draw the button with the current settings
 	GraphicButtonType Type();
 	byte ButtonID();
+	byte ButtonGroup();
 
 private:
 	enum : uint16_t
@@ -71,6 +72,7 @@ private:
 	bool showLabel = true;
 	bool active = true;          // should the button be displayed and touchable
 	bool state = false;     // is the logical state of the button on or off
+	byte buttonGroup = 0;    // group the button belongs to, or 0 if none
 
 	void UpdateBoundingBox();  // update the bounding box for the current size and position
 };
