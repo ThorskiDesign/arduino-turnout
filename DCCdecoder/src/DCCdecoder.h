@@ -30,37 +30,49 @@ Summary:
 
 This class decodes a DCC packet as described in the NMRA specs above. It determines the packet type,
 then processes it to extract the address and specific packet data. Callbacks are provided for each of
-the main packet types. CV support is provided via the EEPROM library, allowing for setting a decoder
-address and for configuration changes.
+the main packet types.
 
 Example Usage:
 
-	DCCdecoder dcc();                        // create an instance of the DCCdecoder
-	dcc.SetupDecoder(0, 0, cv29, false);     // configure the dcc decoder
-	dcc.ProcessPacket(packetData, size);     // send packet data to be decoded
+	DCCdecoder::DecoderSettings settings =
+	{
+		1,      // base address
+		0,      // optional addresses
+		{0,0},
+		true,   // return all packets
+	};
+
+	DCCdecoder dcc;                        // create an instance of the DCCdecoder
+	DCCdecoder dcc { settings };
+
+	dcc.UpdateSettings(settings);          // configure the dcc decoder
 
 Details:
 
-Packet decoding begins when the ProcessPacket is called with packet data. The packet is inspected to
-determine its type, after which specific methods are called to decode it accordingly. Each method
-gets the DCC address, packet data, and any other information from the packet, and then performs a
-callback to pass the decoded data back to the calling library. Packets to addresses other than the
-configured address are ignored by default. Broadcast packets are returned with a value of 0 in the
-address field. Packet data is assumed to be a valid, checksummed packet, for example from the
-DCCpacket class.
-
-Idle, locomotive (short and long), accessory, broadcast (loco and accessory) packet types are supported.
-The basic packet type is determined by masking bits of the packet and conparing to the expected
-patterns as defined in the NMRA spec. Packet specs are ordered beginning with the most common, except
-where the expected bit patterns require a certain sequence. Decoding of the packet data is handled
-specifically for each packet type. Accessory packet types are further categorized in a similar manner.
-Basic and extended packets are supported, as are basic program on main, extended program on main, and
-legacy program on main.
-
-Reading and writing of CVs to non-volatile storage is provided via the EEPROM library. A decoder
+The DCCdecoder class provides the overall management of the bitstream and packet processors. The
+bitstream object handles the raw bitstream capture, and provides data to the packet processor in 
+intervals. The packet processor performs validity checks and provides assembled packets to the
+deocder. The deocder then examines the packets to determine the packet type and its data. A decoder
 address may be configured and stored so that only relevant packets are returned in the callbacks.
 
-TODO: The library currently only implements the most basic locomotive functionality.
+The ProcessTimeStamps() method should be called regularly to check for and process dcc timestamps in
+the queue. Packet decoding begins when the ProcessPacket is called with packet data. The packet is
+inspected to determine its type, after which specific methods are called to decode it accordingly.
+Each method gets the DCC address, packet data, and any other information from the packet, and then
+performs a callback to pass the decoded data back to the calling library. Packets to addresses other
+than the configured address are ignored by default. Broadcast packets are returned with a value of 0
+in the address field. Packet data is assumed to be a valid, checksummed packet, for example from the
+DCCpacket class.
+
+Idle, accessory, extended accessory, and broadcast packet types are supported. The basic packet type
+is determined by masking bits of the packet and conparing to the expected patterns as defined in the
+NMRA spec. Packet specs are ordered beginning with the most common, except where the expected bit
+patterns require a certain sequence. Decoding of the packet data is handled specifically for each
+packet type. Accessory packet types are further categorized in a similar manner. Basic and extended
+packets are supported, as are basic program on main, extended program on main, and legacy program on
+main.
+
+TODO: The library currently only implements placeholders for locomotive functionality.
 
 */
 

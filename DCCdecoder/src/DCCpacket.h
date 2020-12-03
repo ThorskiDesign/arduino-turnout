@@ -36,7 +36,7 @@ handling in the case of incorrect packet lengths or failed checksums.
 Example Usage:
 
 	DCCpacket dccpacket;                            // DCCpacket object, default settings
-	DCCpacket dccpacket(true,false,100);            // with checksum, repeat packet filtering, and repeat interval
+	DCCpacket dccPacket{ true, true, 250 };         // with checksum, repeat packet filtering, and repeat interval
 	dccpacket.ProcessIncomingBits(incomingBits);    // process 32 bits of bitstream data
 
 Details:

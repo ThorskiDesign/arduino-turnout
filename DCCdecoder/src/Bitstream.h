@@ -36,7 +36,7 @@ is performed to provide the data.
 
 Example usage:
 
-	BitStream bitStream();                              // create the bitstream object
+	BitStream bitStream;                                // create the bitstream object
 	bitStream.Resume();                                 // start the bitstream capture
 	bitStream.Suspend();                                // stop the bitstream capture
 	bitStream.ProcessTimeStamps();					    // process any DCC timestamps in the queue
@@ -51,12 +51,12 @@ register is toggled each time in the ISR, so that both rising and falling edges 
 hardware interrupt is similarly configured on CHANGE.
 
 Six combinations of interrupt type, timer, and prescaler are available. Different ISRs are used for
-hardware interrupt vs. the input capture register. Calcualtion of the pulse width is done using
-unsigned int or byte depending on the selection of timer1 or timer2, so that overflows are handled
-correctly. A clock scale factor specifies the number of timer counts per microsecond and is set
-according to the selected prescaler. Standard DCC timings are used when using the input capture
-register. Slightly wider timings are more reliable for the hardware interrupt due to the effect of
-other ISRs that may be running.
+hardware interrupt vs. the input capture register, as well as for AVR vs. ARM architectures.
+Calcualtion of the pulse width is done using unsigned int or byte depending on the selection of
+timer1 or timer2, so that overflows are handled correctly. A clock scale factor specifies the number
+of timer counts per microsecond and is set according to the selected prescaler. Standard DCC timings
+are used when using the input capture register. Slightly wider timings are more reliable for the
+hardware interrupt due to the effect of other ISRs that may be running.
 
 The inspection of the timestamps is performed in three states. In the startup state, pulses are
 inspected to find the first valid half bit. After this, processing proceeds to the seek state, where
