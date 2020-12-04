@@ -1,0 +1,20 @@
+
+SimpleQueue:
+Compiling 'Optimization-test' for 'Arduino/Genuino Uno'
+Program size: 866 bytes (used 3% of a 32,256 byte maximum) (1.20 secs)
+Minimum Memory Usage: 83 bytes (4% of a 2048 byte maximum)
+ 
+BitStream:
+Compiling 'Optimization-test' for 'Arduino/Genuino Uno'
+Program size: 1,712 bytes (used 5% of a 32,256 byte maximum) (1.89 secs)
+Minimum Memory Usage: 82 bytes (4% of a 2048 byte maximum)
+ 
+DCCpacket:
+Compiling 'Optimization-test' for 'Arduino/Genuino Uno'
+Program size: 924 bytes (used 3% of a 32,256 byte maximum) (1.76 secs)
+Minimum Memory Usage: 236 bytes (12% of a 2048 byte maximum)
+ 
+DCCdecoder:
+Compiling 'Optimization-test' for 'Arduino/Genuino Uno'
+Program size: 4,392 bytes (used 14% of a 32,256 byte maximum) (2.05 secs)
+Minimum Memory Usage: 408 bytes (20% of a 2048 byte maximum)
